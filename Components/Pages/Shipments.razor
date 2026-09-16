@@ -1,0 +1,308 @@
+@page "/shipments"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using GBS_Web.Data
+@using Remessa = GBS_Web.Models.Remessa
+@using ItemRemessa = GBS_Web.Models.ItemRemessa
+@using Equipamento = GBS_Web.Models.Equipamento
+@inject RemessaRepository Repository
+
+<PageTitle>Shipments</PageTitle>
+
+<h1>Shipments</h1>
+
+<button class="btn btn-primary mb-3" @onclick="OpenNewModal">+ New Shipment</button>
+
+@if (_loading)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_shipments.Count == 0)
+{
+    <p><em>No shipments found.</em></p>
+}
+else
+{
+    <table class="table table-striped table-hover">
+        <thead>
+            <tr>
+                <th>Ref</th>
+                <th>Carrier</th>
+                <th>Tracking</th>
+                <th>Recipient</th>
+                <th>Items</th>
+                <th>Created</th>
+                <th>Delivered</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var s in _shipments)
+            {
+                <tr>
+                    <td>@s.RemessaRef</td>
+                    <td>@s.Carrier</td>
+                    <td>@s.TrackingNumber</td>
+                    <td>@s.RecipientName</td>
+                    <td>@s.TotalItens</td>
+                    <td>@(s.DataCadastro?.ToString("yyyy-MM-dd HH:mm"))</td>
+                    <td>@(s.DataEntrega?.ToString("yyyy-MM-dd HH:mm"))</td>
+                    <td style="width: 200px;">
+                        <select class="form-select form-select-sm" value="@s.StatusRemessa"
+                                @onchange="e => OnStatusChanged(s, e)">
+                            <option value="LABEL_CREATED">LABEL_CREATED</option>
+                            <option value="PICKED_UP">PICKED_UP</option>
+                            <option value="IN_TRANSIT">IN_TRANSIT</option>
+                            <option value="OUT_FOR_DELIVERY">OUT_FOR_DELIVERY</option>
+                            <option value="DELIVERED">DELIVERED</option>
+                            <option value="DELAYED">DELAYED</option>
+                            <option value="EXCEPTION">EXCEPTION</option>
+                            <option value="RETURNED">RETURNED</option>
+                        </select>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@if (_statusMessage is not null)
+{
+    <div class="alert @(_statusIsError ? "alert-danger" : "alert-success")">@_statusMessage</div>
+}
+
+@if (_showNewModal)
+{
+    <div class="modal d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">New Shipment</h5>
+                    <button type="button" class="btn-close" @onclick="CloseNewModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Carrier</label>
+                            <select class="form-select" @bind="_newRemessa.Carrier">
+                                <option value="FEDEX">FEDEX</option>
+                                <option value="UPS">UPS</option>
+                                <option value="USPS">USPS</option>
+                                <option value="DHL">DHL</option>
+                                <option value="OTHER">OTHER</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Tracking Number *</label>
+                            <input class="form-control" @bind="_newRemessa.TrackingNumber" />
+                        </div>
+                        <div class="col-md-5 mb-3">
+                            <label class="form-label">Recipient Name *</label>
+                            <input class="form-control" @bind="_newRemessa.RecipientName" />
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notes</label>
+                        <input class="form-control" @bind="_newRemessa.Notes" />
+                    </div>
+
+                    <hr />
+                    <h6>Add equipment</h6>
+                    <div class="d-flex gap-2 mb-2">
+                        <input class="form-control" placeholder="Search UID, model, brand..."
+                               @bind="_equipSearch" @bind:event="oninput" @onkeyup="OnEquipSearchKeyUp" />
+                        <button class="btn btn-outline-secondary" @onclick="SearchEquipment">Search</button>
+                    </div>
+
+                    @if (_searchResults.Count > 0)
+                    {
+                        <table class="table table-sm table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>UID</th><th>Manufacturer</th><th>Model</th><th>CPU</th><th>Status</th><th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var eq in _searchResults)
+                                {
+                                    <tr>
+                                        <td>@eq.InternalUid</td>
+                                        <td>@eq.Manufacturer</td>
+                                        <td>@eq.Model</td>
+                                        <td>@eq.CpuModel</td>
+                                        <td>@eq.Status</td>
+                                        <td>
+                                            <button class="btn btn-sm btn-outline-primary" @onclick="() => AddItem(eq)"
+                                                    disabled="@_selectedItems.Any(i => i.IdEquipamento == eq.IdEquipamento)">
+                                                Add
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+
+                    <h6>Items in this shipment (@_selectedItems.Count)</h6>
+                    @if (_selectedItems.Count == 0)
+                    {
+                        <p class="text-muted"><em>No items added yet.</em></p>
+                    }
+                    else
+                    {
+                        <table class="table table-sm table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>UID</th><th>Manufacturer</th><th>Model</th><th>Sale Price (USD)</th><th>Notes</th><th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in _selectedItems)
+                                {
+                                    <tr>
+                                        <td>@item.InternalUid</td>
+                                        <td>@item.Manufacturer</td>
+                                        <td>@item.Model</td>
+                                        <td><input class="form-control form-control-sm" type="number" step="0.01" @bind="item.SalePriceUsd" /></td>
+                                        <td><input class="form-control form-control-sm" @bind="item.Notes" /></td>
+                                        <td>
+                                            <button class="btn btn-sm btn-outline-danger" @onclick="() => RemoveItem(item)">Remove</button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+
+                    @if (!string.IsNullOrEmpty(_validationError))
+                    {
+                        <div class="alert alert-warning">@_validationError</div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseNewModal">Cancel</button>
+                    <button type="button" class="btn btn-primary" disabled="@_saving" @onclick="SaveShipment">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Remessa> _shipments = new();
+    private bool _loading = true;
+    private bool _showNewModal;
+    private bool _saving;
+    private string? _validationError;
+    private string? _statusMessage;
+    private bool _statusIsError;
+
+    private Remessa _newRemessa = new();
+    private string _equipSearch = "";
+    private List<Equipamento> _searchResults = new();
+    private List<ItemRemessa> _selectedItems = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadShipmentsAsync();
+    }
+
+    private async Task LoadShipmentsAsync()
+    {
+        _loading = true;
+        _shipments = await Repository.GetActiveShipmentsAsync();
+        _loading = false;
+    }
+
+    private void OpenNewModal()
+    {
+        _newRemessa = new Remessa();
+        _equipSearch = "";
+        _searchResults = new();
+        _selectedItems = new();
+        _validationError = null;
+        _showNewModal = true;
+    }
+
+    private void CloseNewModal() => _showNewModal = false;
+
+    private async Task OnEquipSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SearchEquipment();
+        }
+    }
+
+    private async Task SearchEquipment()
+    {
+        _searchResults = await Repository.GetAvailableEquipmentAsync(_equipSearch);
+    }
+
+    private void AddItem(Equipamento eq)
+    {
+        if (_selectedItems.Any(i => i.IdEquipamento == eq.IdEquipamento)) return;
+
+        _selectedItems.Add(new ItemRemessa
+        {
+            IdEquipamento = eq.IdEquipamento,
+            InternalUid = eq.InternalUid,
+            Manufacturer = eq.Manufacturer,
+            Model = eq.Model
+        });
+    }
+
+    private void RemoveItem(ItemRemessa item) => _selectedItems.Remove(item);
+
+    private async Task SaveShipment()
+    {
+        _validationError = null;
+
+        if (string.IsNullOrWhiteSpace(_newRemessa.TrackingNumber) || string.IsNullOrWhiteSpace(_newRemessa.RecipientName))
+        {
+            _validationError = "Fill in Tracking Number and Recipient Name.";
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var refCode = await Repository.CreateShipmentAsync(_newRemessa, _selectedItems);
+            _showNewModal = false;
+            _statusMessage = $"Shipment created: {refCode}";
+            _statusIsError = false;
+            await LoadShipmentsAsync();
+        }
+        catch (Exception ex)
+        {
+            _validationError = $"Error creating shipment: {ex.Message}";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task OnStatusChanged(Remessa s, ChangeEventArgs e)
+    {
+        var newStatus = e.Value?.ToString() ?? s.StatusRemessa;
+        if (newStatus == s.StatusRemessa) return;
+
+        try
+        {
+            await Repository.UpdateStatusAsync(s.IdRemessa, s.RemessaRef, newStatus);
+            s.StatusRemessa = newStatus;
+            _statusMessage = newStatus == "DELIVERED"
+                ? $"{s.RemessaRef} marked DELIVERED — its equipment has been set to SOLD."
+                : $"{s.RemessaRef} status updated to {newStatus}.";
+            _statusIsError = false;
+            await LoadShipmentsAsync();
+        }
+        catch (Exception ex)
+        {
+            _statusMessage = $"Error updating status: {ex.Message}";
+            _statusIsError = true;
+        }
+    }
+}

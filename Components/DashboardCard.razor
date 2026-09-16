@@ -1,0 +1,14 @@
+<div class="col-md-@Col">
+    <div class="card text-center shadow-sm h-100">
+        <div class="card-body">
+            <div class="display-6">@Value</div>
+            <div class="text-muted">@Title</div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public int Value { get; set; }
+    [Parameter] public int Col { get; set; } = 3;
+}

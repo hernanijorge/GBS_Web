@@ -1,0 +1,296 @@
+@page "/components"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using GBS_Web.Data
+@using Component = GBS_Web.Models.Component
+@inject ComponentRepository Repository
+
+<PageTitle>Components</PageTitle>
+
+<h1>Components</h1>
+
+<button class="btn btn-primary mb-3" @onclick="OpenAddModal">+ Add Component</button>
+
+@if (_loading)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_components.Count == 0)
+{
+    <p><em>No components found.</em></p>
+}
+else
+{
+    <table class="table table-striped table-hover">
+        <thead>
+            <tr>
+                <th>UID</th>
+                <th>Type</th>
+                <th>Description</th>
+                <th>Brand</th>
+                <th>Condition</th>
+                <th>Created</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var c in _components)
+            {
+                <tr>
+                    <td>@c.InternalUid</td>
+                    <td>@c.ComponentType</td>
+                    <td>@c.DisplayLabel</td>
+                    <td>@c.Brand</td>
+                    <td>@c.ConditionStatus</td>
+                    <td>@(c.DateCreated?.ToString("yyyy-MM-dd HH:mm"))</td>
+                    <td style="width: 160px;">
+                        <select class="form-select form-select-sm" value="@c.Status"
+                                @onchange="e => OnStatusChanged(c, e)">
+                            <option value="IN_STOCK">IN_STOCK</option>
+                            <option value="INSTALLED">INSTALLED</option>
+                            <option value="SOLD">SOLD</option>
+                            <option value="SCRAPPED">SCRAPPED</option>
+                        </select>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@if (_showAddModal)
+{
+    <div class="modal d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Component</h5>
+                    <button type="button" class="btn-close" @onclick="CloseAddModal"></button>
+                </div>
+                <div class="modal-body">
+                    <EditForm Model="_newComponent" OnValidSubmit="SaveComponent">
+                        <div class="mb-3">
+                            <label class="form-label">Type</label>
+                            <select class="form-select" @bind="_newComponent.ComponentType" @bind:after="OnTypeChanged">
+                                <option value="RAM">RAM</option>
+                                <option value="SSD">SSD</option>
+                                <option value="HDD">HDD</option>
+                                <option value="MINI_DESKTOP">Mini Desktop</option>
+                            </select>
+                        </div>
+
+                        @if (_isMiniDesktop)
+                        {
+                            <div class="mb-3">
+                                <label class="form-label">RAM (GB) *</label>
+                                <input class="form-control" type="number" @bind="_newComponent.CapacityGb" />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">CPU *</label>
+                                <input class="form-control" @bind="_newComponent.Cpu" />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Storage (GB) *</label>
+                                <input class="form-control" type="number" @bind="_storageGbInput" />
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="mb-3">
+                                <label class="form-label">Capacity (GB) *</label>
+                                <input class="form-control" type="number" @bind="_newComponent.CapacityGb" />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Generation</label>
+                                <input class="form-control" @bind="_newComponent.Generation" placeholder="DDR4, DDR5, NVMe, SATA..." />
+                            </div>
+                            @if (_newComponent.ComponentType == "RAM")
+                            {
+                                <div class="mb-3">
+                                    <label class="form-label">Speed (MHz)</label>
+                                    <input class="form-control" type="number" @bind="_speedInput" />
+                                </div>
+                            }
+                        }
+
+                        <div class="mb-3">
+                            <label class="form-label">Brand</label>
+                            <input class="form-control" list="brandsList" @bind="_newComponent.Brand" />
+                            <datalist id="brandsList">
+                                @foreach (var b in _brands)
+                                {
+                                    <option value="@b"></option>
+                                }
+                            </datalist>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Part Number</label>
+                            <input class="form-control" @bind="_newComponent.PartNumber" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Condition</label>
+                            <select class="form-select" @bind="_newComponent.ConditionStatus">
+                                <option value="GOOD">GOOD</option>
+                                <option value="FAIR">FAIR</option>
+                                <option value="POOR">POOR</option>
+                                <option value="UNTESTED">UNTESTED</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Status</label>
+                            <select class="form-select" @bind="_newComponent.Status">
+                                <option value="IN_STOCK">IN_STOCK</option>
+                                <option value="INSTALLED">INSTALLED</option>
+                                <option value="SOLD">SOLD</option>
+                                <option value="SCRAPPED">SCRAPPED</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Source Batch</label>
+                            <input class="form-control" @bind="_newComponent.SourceBatch" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Notes</label>
+                            <textarea class="form-control" @bind="_newComponent.Notes"></textarea>
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(_validationError))
+                        {
+                            <div class="alert alert-warning">@_validationError</div>
+                        }
+
+                        <div class="modal-footer px-0 pb-0">
+                            <button type="button" class="btn btn-secondary" @onclick="CloseAddModal">Cancel</button>
+                            <button type="submit" class="btn btn-primary" disabled="@_saving">Save</button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Component> _components = new();
+    private List<string> _brands = new();
+    private bool _loading = true;
+    private bool _showAddModal;
+    private bool _saving;
+    private bool _isMiniDesktop;
+    private string? _validationError;
+    private int? _speedInput;
+    private int? _storageGbInput;
+    private Component _newComponent = NewEmptyComponent();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadComponentsAsync();
+        _brands = await Repository.GetBrandsAsync();
+    }
+
+    private async Task LoadComponentsAsync()
+    {
+        _loading = true;
+        _components = await Repository.GetAllAsync();
+        _loading = false;
+    }
+
+    private static Component NewEmptyComponent() => new()
+    {
+        ComponentType = "RAM",
+        ConditionStatus = "GOOD",
+        Status = "IN_STOCK"
+    };
+
+    private void OpenAddModal()
+    {
+        _newComponent = NewEmptyComponent();
+        _speedInput = null;
+        _storageGbInput = null;
+        _isMiniDesktop = false;
+        _validationError = null;
+        _showAddModal = true;
+    }
+
+    private void CloseAddModal()
+    {
+        _showAddModal = false;
+    }
+
+    private void OnTypeChanged()
+    {
+        _isMiniDesktop = _newComponent.ComponentType == "MINI_DESKTOP";
+        _newComponent.CapacityGb = 0;
+        _newComponent.Generation = null;
+        _newComponent.Cpu = null;
+        _speedInput = null;
+        _storageGbInput = null;
+    }
+
+    private async Task SaveComponent()
+    {
+        _validationError = null;
+
+        if (string.IsNullOrWhiteSpace(_newComponent.ComponentType))
+        {
+            _validationError = "Type is required.";
+            return;
+        }
+
+        if (_newComponent.CapacityGb <= 0)
+        {
+            _validationError = _isMiniDesktop ? "RAM (GB) is required." : "Capacity is required.";
+            return;
+        }
+
+        if (_isMiniDesktop)
+        {
+            if (string.IsNullOrWhiteSpace(_newComponent.Cpu))
+            {
+                _validationError = "CPU is required for Mini Desktop.";
+                return;
+            }
+            if (_storageGbInput is null or <= 0)
+            {
+                _validationError = "Storage (GB) is required for Mini Desktop.";
+                return;
+            }
+            _newComponent.StorageGb = _storageGbInput;
+        }
+        else
+        {
+            _newComponent.StorageGb = null;
+            _newComponent.SpeedMhz = _newComponent.ComponentType == "RAM" ? _speedInput : null;
+        }
+
+        _saving = true;
+        try
+        {
+            await Repository.AddAsync(_newComponent);
+            _showAddModal = false;
+            await LoadComponentsAsync();
+        }
+        catch (Exception ex)
+        {
+            _validationError = $"Error saving component: {ex.Message}";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task OnStatusChanged(Component c, ChangeEventArgs e)
+    {
+        var newStatus = e.Value?.ToString() ?? c.Status;
+        if (newStatus == c.Status) return;
+        await Repository.UpdateStatusAsync(c.IdComponent, newStatus);
+        c.Status = newStatus;
+    }
+}

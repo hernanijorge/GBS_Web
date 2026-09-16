@@ -1,0 +1,298 @@
+@page "/upgrades"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using GBS_Web.Data
+@using Upgrade = GBS_Web.Models.Upgrade
+@using Equipamento = GBS_Web.Models.Equipamento
+@inject UpgradeRepository Repository
+@inject EquipamentoRepository EquipRepository
+
+<PageTitle>Upgrades</PageTitle>
+
+<h1>Upgrades</h1>
+
+<div class="d-flex gap-2 mb-3 align-items-end">
+    <div>
+        <label class="form-label mb-0">Show last</label>
+        <select class="form-select" @bind="_days" @bind:after="LoadUpgradesAsync">
+            <option value="7">7 days</option>
+            <option value="30">30 days</option>
+            <option value="90">90 days</option>
+            <option value="365">365 days</option>
+        </select>
+    </div>
+    <button class="btn btn-primary ms-auto" @onclick="OpenNewModal">+ Register Upgrade</button>
+</div>
+
+@if (_loading)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_upgrades.Count == 0)
+{
+    <p><em>No upgrades found in this period.</em></p>
+}
+else
+{
+    <table class="table table-striped table-hover">
+        <thead>
+            <tr>
+                <th>UID</th>
+                <th>Component</th>
+                <th>Before</th>
+                <th>After</th>
+                <th>Technician</th>
+                <th>Notes</th>
+                <th>Date</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var u in _upgrades)
+            {
+                <tr>
+                    <td>@u.InternalUid</td>
+                    <td>@u.ComponentType</td>
+                    <td>@u.ValueBefore</td>
+                    <td>@u.ValueAfter</td>
+                    <td>@u.Technician</td>
+                    <td>@u.Notes</td>
+                    <td>@(u.DataUpgrade?.ToString("yyyy-MM-dd HH:mm"))</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@if (_statusMessage is not null)
+{
+    <div class="alert @(_statusIsError ? "alert-danger" : "alert-success")">@_statusMessage</div>
+}
+
+@if (_showNewModal)
+{
+    <div class="modal d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Register Upgrade</h5>
+                    <button type="button" class="btn-close" @onclick="CloseNewModal"></button>
+                </div>
+                <div class="modal-body">
+                    <h6>Equipment</h6>
+                    @if (_selectedEquip is null)
+                    {
+                        <div class="d-flex gap-2 mb-2">
+                            <input class="form-control" placeholder="Search UID, model, brand..."
+                                   @bind="_equipSearch" @bind:event="oninput" @onkeyup="OnEquipSearchKeyUp" />
+                            <button class="btn btn-outline-secondary" @onclick="SearchEquipment">Search</button>
+                        </div>
+                        @if (_searchResults.Count > 0)
+                        {
+                            <table class="table table-sm table-bordered">
+                                <thead>
+                                    <tr><th>UID</th><th>Manufacturer</th><th>Model</th><th>RAM</th><th>Storage</th><th>Status</th><th></th></tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var eq in _searchResults)
+                                    {
+                                        <tr>
+                                            <td>@eq.InternalUid</td>
+                                            <td>@eq.Manufacturer</td>
+                                            <td>@eq.Model</td>
+                                            <td>@eq.RamGb</td>
+                                            <td>@eq.StorageGb</td>
+                                            <td>@eq.Status</td>
+                                            <td><button class="btn btn-sm btn-outline-primary" @onclick="() => SelectEquipment(eq)">Select</button></td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                    }
+                    else
+                    {
+                        <div class="alert alert-info d-flex justify-content-between align-items-center">
+                            <span><strong>@_selectedEquip.InternalUid</strong> — @_selectedEquip.Manufacturer @_selectedEquip.Model (RAM @_selectedEquip.RamGb GB, Storage @_selectedEquip.StorageGb GB)</span>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="ClearEquipment">Change</button>
+                        </div>
+                    }
+
+                    <hr />
+
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Component *</label>
+                            <select class="form-select" @bind="_newUpgrade.ComponentType" @bind:after="OnComponentTypeChanged">
+                                <option value="RAM">RAM</option>
+                                <option value="SSD">SSD</option>
+                                <option value="HDD">HDD</option>
+                                <option value="BATTERY">BATTERY</option>
+                                <option value="SCREEN">SCREEN</option>
+                                <option value="KEYBOARD">KEYBOARD</option>
+                                <option value="COVER">COVER</option>
+                                <option value="GPU">GPU</option>
+                                <option value="OTHER">OTHER</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Value BEFORE</label>
+                            <input class="form-control" placeholder="e.g. 8 GB" @bind="_newUpgrade.ValueBefore" />
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Value AFTER *</label>
+                            <input class="form-control" placeholder="e.g. 16 GB" @bind="_newUpgrade.ValueAfter" />
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Part Source</label>
+                            <input class="form-control" list="originsList" @bind="_newUpgrade.SourceOrigem" />
+                            <datalist id="originsList">
+                                @foreach (var o in _origins)
+                                {
+                                    <option value="@o"></option>
+                                }
+                            </datalist>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Cost (USD)</label>
+                            <input class="form-control" type="number" step="0.01" @bind="_newUpgrade.CostUsd" />
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Technician</label>
+                            <input class="form-control" @bind="_newUpgrade.Technician" />
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Notes</label>
+                        <textarea class="form-control" @bind="_newUpgrade.Notes"></textarea>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(_validationError))
+                    {
+                        <div class="alert alert-warning">@_validationError</div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseNewModal">Cancel</button>
+                    <button type="button" class="btn btn-primary" disabled="@_saving" @onclick="SaveUpgrade">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Upgrade> _upgrades = new();
+    private bool _loading = true;
+    private int _days = 30;
+
+    private bool _showNewModal;
+    private bool _saving;
+    private string? _validationError;
+    private string? _statusMessage;
+    private bool _statusIsError;
+
+    private Upgrade _newUpgrade = new();
+    private string _equipSearch = "";
+    private List<Equipamento> _searchResults = new();
+    private Equipamento? _selectedEquip;
+    private List<string> _origins = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUpgradesAsync();
+    }
+
+    private async Task LoadUpgradesAsync()
+    {
+        _loading = true;
+        _upgrades = await Repository.GetRecentUpgradesAsync(_days);
+        _loading = false;
+    }
+
+    private async Task OpenNewModal()
+    {
+        _newUpgrade = new Upgrade();
+        _equipSearch = "";
+        _searchResults = new();
+        _selectedEquip = null;
+        _validationError = null;
+        _origins = await Repository.GetDistinctOriginsAsync();
+        _showNewModal = true;
+    }
+
+    private void CloseNewModal() => _showNewModal = false;
+
+    private async Task OnEquipSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await SearchEquipment();
+    }
+
+    private async Task SearchEquipment()
+    {
+        _searchResults = await EquipRepository.GetAllAsync(_equipSearch, null);
+    }
+
+    private void SelectEquipment(Equipamento eq)
+    {
+        _selectedEquip = eq;
+        _searchResults = new();
+    }
+
+    private void ClearEquipment() => _selectedEquip = null;
+
+    private void OnComponentTypeChanged()
+    {
+        if (_selectedEquip is null) return;
+
+        var tipo = _newUpgrade.ComponentType;
+        if (tipo == "RAM")
+        {
+            _newUpgrade.ValueBefore = _selectedEquip.RamGb is > 0 ? $"{_selectedEquip.RamGb} GB" : "";
+        }
+        else if (tipo is "SSD" or "HDD")
+        {
+            _newUpgrade.ValueBefore = _selectedEquip.StorageGb is > 0 ? $"{_selectedEquip.StorageGb} GB" : "";
+        }
+    }
+
+    private async Task SaveUpgrade()
+    {
+        _validationError = null;
+
+        if (_selectedEquip is null)
+        {
+            _validationError = "Select the equipment being upgraded.";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(_newUpgrade.ValueAfter))
+        {
+            _validationError = "Fill in the Value AFTER (e.g.: 16 GB, 512 GB).";
+            return;
+        }
+
+        _newUpgrade.IdEquipamento = _selectedEquip.IdEquipamento;
+
+        _saving = true;
+        try
+        {
+            await Repository.CreateUpgradeAsync(_newUpgrade);
+            _showNewModal = false;
+            _statusMessage = $"Upgrade registered for {_selectedEquip.InternalUid}.";
+            _statusIsError = false;
+            await LoadUpgradesAsync();
+        }
+        catch (Exception ex)
+        {
+            _validationError = $"Error saving upgrade: {ex.Message}";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

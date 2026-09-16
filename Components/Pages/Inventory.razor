@@ -1,0 +1,288 @@
+@page "/inventory"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using GBS_Web.Data
+@using Equipamento = GBS_Web.Models.Equipamento
+@inject EquipamentoRepository Repository
+
+<PageTitle>Inventory</PageTitle>
+
+<h1>Inventory</h1>
+
+<div class="d-flex gap-2 mb-3 flex-wrap align-items-end">
+    <div>
+        <label class="form-label mb-0">Search</label>
+        <input class="form-control" placeholder="UID, serial, model, brand, CPU..."
+               @bind="_search" @bind:event="oninput" @onkeyup="OnSearchKeyUp" style="min-width: 260px;" />
+    </div>
+    <div>
+        <label class="form-label mb-0">Status</label>
+        <select class="form-select" @bind="_statusFilter" @bind:after="LoadEquipmentAsync">
+            <option value="">(All)</option>
+            <option value="IN_STOCK">IN_STOCK</option>
+            <option value="AVAILABLE">AVAILABLE</option>
+            <option value="SHIPPED">SHIPPED</option>
+            <option value="SOLD">SOLD</option>
+            <option value="SCRAPPED">SCRAPPED</option>
+            <option value="IN_REPAIR">IN_REPAIR</option>
+            <option value="RESERVED">RESERVED</option>
+            <option value="OTHER">OTHER</option>
+        </select>
+    </div>
+    <button class="btn btn-outline-secondary" @onclick="LoadEquipmentAsync">Search</button>
+    <button class="btn btn-primary ms-auto" @onclick="OpenAddModal">+ Add Equipment</button>
+</div>
+
+@if (_loading)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_equipment.Count == 0)
+{
+    <p><em>No equipment found.</em></p>
+}
+else
+{
+    <table class="table table-striped table-hover">
+        <thead>
+            <tr>
+                <th>UID</th>
+                <th>Manufacturer</th>
+                <th>Model</th>
+                <th>Serial</th>
+                <th>CPU</th>
+                <th>RAM</th>
+                <th>Storage</th>
+                <th>Condition</th>
+                <th>Created</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var eq in _equipment)
+            {
+                <tr>
+                    <td>@eq.InternalUid</td>
+                    <td>@eq.Manufacturer</td>
+                    <td>@eq.Model</td>
+                    <td>@eq.SerialNumber</td>
+                    <td>@eq.CpuModel</td>
+                    <td>@(eq.RamGb is > 0 ? $"{eq.RamGb} GB" : "")</td>
+                    <td>@(eq.StorageGb is > 0 ? $"{eq.StorageGb} GB" : "")</td>
+                    <td>@eq.ConditionStatus</td>
+                    <td>@(eq.DataCadastro?.ToString("yyyy-MM-dd HH:mm"))</td>
+                    <td style="width: 160px;">
+                        <select class="form-select form-select-sm" value="@eq.Status"
+                                @onchange="e => OnStatusChanged(eq, e)">
+                            <option value="IN_STOCK">IN_STOCK</option>
+                            <option value="AVAILABLE">AVAILABLE</option>
+                            <option value="SHIPPED">SHIPPED</option>
+                            <option value="SOLD">SOLD</option>
+                            <option value="SCRAPPED">SCRAPPED</option>
+                            <option value="IN_REPAIR">IN_REPAIR</option>
+                            <option value="RESERVED">RESERVED</option>
+                            <option value="OTHER">OTHER</option>
+                        </select>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@if (_showAddModal)
+{
+    <div class="modal d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Equipment</h5>
+                    <button type="button" class="btn-close" @onclick="CloseAddModal"></button>
+                </div>
+                <div class="modal-body">
+                    <EditForm Model="_newEquipamento" OnValidSubmit="SaveEquipamento">
+                        <div class="mb-3">
+                            <label class="form-label">Internal UID *</label>
+                            <input class="form-control" @bind="_newEquipamento.InternalUid" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Manufacturer *</label>
+                            <input class="form-control" list="manufacturersList" @bind="_newEquipamento.Manufacturer" />
+                            <datalist id="manufacturersList">
+                                @foreach (var m in _manufacturers)
+                                {
+                                    <option value="@m"></option>
+                                }
+                            </datalist>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Model *</label>
+                            <input class="form-control" @bind="_newEquipamento.Model" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Serial Number</label>
+                            <input class="form-control" @bind="_newEquipamento.SerialNumber" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Processor</label>
+                            <input class="form-control" @bind="_newEquipamento.CpuModel" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">RAM (GB)</label>
+                            <input class="form-control" type="number" @bind="_newEquipamento.RamGb" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Storage (GB)</label>
+                            <input class="form-control" type="number" @bind="_newEquipamento.StorageGb" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Condition Status *</label>
+                            <select class="form-select" @bind="_newEquipamento.ConditionStatus">
+                                <option value="EXCELLENT">EXCELLENT</option>
+                                <option value="GOOD">GOOD</option>
+                                <option value="FAIR">FAIR</option>
+                                <option value="POOR">POOR</option>
+                                <option value="NO_BATTERY">NO_BATTERY</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Status *</label>
+                            <select class="form-select" @bind="_newEquipamento.Status">
+                                <option value="IN_STOCK">IN_STOCK</option>
+                                <option value="IN_REPAIR">IN_REPAIR</option>
+                                <option value="SCRAPPED">SCRAPPED</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Source Batch</label>
+                            <input class="form-control" @bind="_newEquipamento.SourceBatch" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Notes</label>
+                            <textarea class="form-control" @bind="_newEquipamento.Notes"></textarea>
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(_validationError))
+                        {
+                            <div class="alert alert-warning">@_validationError</div>
+                        }
+
+                        <div class="modal-footer px-0 pb-0">
+                            <button type="button" class="btn btn-secondary" @onclick="CloseAddModal">Cancel</button>
+                            <button type="submit" class="btn btn-primary" disabled="@_saving">Save</button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Equipamento> _equipment = new();
+    private List<string> _manufacturers = new();
+    private bool _loading = true;
+    private bool _showAddModal;
+    private bool _saving;
+    private string? _validationError;
+    private string _search = "";
+    private string _statusFilter = "";
+    private Equipamento _newEquipamento = NewEmptyEquipamento();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEquipmentAsync();
+        _manufacturers = await Repository.GetManufacturersAsync();
+    }
+
+    private async Task LoadEquipmentAsync()
+    {
+        _loading = true;
+        _equipment = await Repository.GetAllAsync(
+            string.IsNullOrWhiteSpace(_search) ? null : _search.Trim(),
+            string.IsNullOrWhiteSpace(_statusFilter) ? null : _statusFilter);
+        _loading = false;
+    }
+
+    private async Task OnSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await LoadEquipmentAsync();
+        }
+    }
+
+    private static Equipamento NewEmptyEquipamento() => new()
+    {
+        ConditionStatus = "GOOD",
+        Status = "IN_STOCK"
+    };
+
+    private void OpenAddModal()
+    {
+        _newEquipamento = NewEmptyEquipamento();
+        _validationError = null;
+        _showAddModal = true;
+    }
+
+    private void CloseAddModal()
+    {
+        _showAddModal = false;
+    }
+
+    private async Task SaveEquipamento()
+    {
+        _validationError = null;
+
+        if (string.IsNullOrWhiteSpace(_newEquipamento.InternalUid))
+        {
+            _validationError = "Internal UID is required.";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(_newEquipamento.Manufacturer))
+        {
+            _validationError = "Manufacturer is required.";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(_newEquipamento.Model))
+        {
+            _validationError = "Model is required.";
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            await Repository.AddAsync(_newEquipamento);
+            _showAddModal = false;
+            await LoadEquipmentAsync();
+        }
+        catch (Exception ex)
+        {
+            _validationError = $"Error saving equipment: {ex.Message}";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task OnStatusChanged(Equipamento eq, ChangeEventArgs e)
+    {
+        var newStatus = e.Value?.ToString() ?? eq.Status;
+        if (newStatus == eq.Status) return;
+        await Repository.UpdateStatusAsync(eq.InternalUid, newStatus);
+        eq.Status = newStatus;
+    }
+}

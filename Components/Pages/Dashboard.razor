@@ -1,0 +1,46 @@
+@page "/"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using GBS_Web.Data
+@inject DashboardRepository Repository
+
+<PageTitle>Dashboard</PageTitle>
+
+<h1>Dashboard</h1>
+
+@if (_loading)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <h5 class="text-muted mt-3">Equipment totals</h5>
+    <div class="row g-3 mb-4">
+        <DashboardCard Title="Total Units" Value="_totals!.TotalUnidades" Col="2" />
+        <DashboardCard Title="In Stock" Value="_totals!.EmEstoque" Col="2" />
+        <DashboardCard Title="Good Condition" Value="_totals!.CondicaoBoa" Col="2" />
+        <DashboardCard Title="Upgrades (30d)" Value="_totals!.Upgrades30d" Col="2" />
+        <DashboardCard Title="Active Shipments" Value="_totals!.RemessasAtivas" Col="2" />
+    </div>
+
+    <h5 class="text-muted">In-stock breakdown (distinct)</h5>
+    <div class="row g-3">
+        <DashboardCard Title="Manufacturer (IN_STOCK)" Value="_resumo!.ManufacturerCount" Col="3" />
+        <DashboardCard Title="Model (IN_STOCK)" Value="_resumo!.ModelCount" Col="3" />
+        <DashboardCard Title="CPU Family (IN_STOCK)" Value="_resumo!.CpuFamilyCount" Col="3" />
+    </div>
+}
+
+@code {
+    private bool _loading = true;
+    private DashboardTotals? _totals;
+    private DashboardResumoCards? _resumo;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _totals = await Repository.GetTotalsAsync();
+        _resumo = await Repository.GetResumoCardsAsync();
+        _loading = false;
+    }
+}
