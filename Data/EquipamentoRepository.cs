@@ -12,6 +12,44 @@ public class EquipamentoRepository
         _connectionString = OracleConnectionFactory.BuildConnectionString(configuration);
     }
 
+    // Port of clsGravacaoEquipamento.upsertEquipamento (bulk-import path) via
+    // PACK_EQUIPAMENTO.PROC_UPSERT_EQUIPAMENTO. The desktop's version always
+    // reports "INSERTED" on success regardless of whether it inserted or
+    // updated (the function never checks) — we check existence first so the
+    // import summary's Inserted/Updated counts are actually accurate.
+    public async Task<string> UpsertAsync(OracleConnection connection, OracleTransaction transaction, Models.Equipamento equipamento)
+    {
+        using (var checkCommand = connection.CreateCommand())
+        {
+            checkCommand.Transaction = transaction;
+            checkCommand.CommandType = CommandType.Text;
+            checkCommand.CommandText = "SELECT COUNT(*) FROM TBL_EQUIPAMENTO WHERE INTERNAL_UID = :P_UID";
+            checkCommand.BindByName = true;
+            AddParam(checkCommand, "P_UID", OracleDbType.Varchar2, equipamento.InternalUid);
+            var exists = Convert.ToInt32(await checkCommand.ExecuteScalarAsync()) > 0;
+
+            using var command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandType = CommandType.StoredProcedure;
+            command.CommandText = "PACK_EQUIPAMENTO.PROC_UPSERT_EQUIPAMENTO";
+            command.BindByName = true;
+
+            AddParam(command, "P_INTERNAL_UID", OracleDbType.Varchar2, equipamento.InternalUid);
+            AddParam(command, "P_SERIAL_NUMBER", OracleDbType.Varchar2, equipamento.SerialNumber);
+            AddParam(command, "P_MODEL", OracleDbType.Varchar2, equipamento.Model);
+            AddParam(command, "P_MARCA", OracleDbType.Varchar2, equipamento.Manufacturer);
+            AddParam(command, "P_PROCESSADOR", OracleDbType.Varchar2, equipamento.CpuModel);
+            AddParam(command, "P_RAM_GB", OracleDbType.Decimal, equipamento.RamGb);
+            AddParam(command, "P_STORAGE_GB", OracleDbType.Decimal, equipamento.StorageGb);
+            AddParam(command, "P_CONDITION_STATUS", OracleDbType.Varchar2, equipamento.ConditionStatus);
+            AddParam(command, "P_STATUS", OracleDbType.Varchar2, equipamento.Status);
+            AddParam(command, "P_OBSERVACAO", OracleDbType.Varchar2, equipamento.Notes);
+
+            await command.ExecuteNonQueryAsync();
+            return exists ? "UPDATED" : "INSERTED";
+        }
+    }
+
     public async Task<List<Models.Equipamento>> GetAllAsync(string? filtro = null, string? status = null)
     {
         var list = new List<Models.Equipamento>();

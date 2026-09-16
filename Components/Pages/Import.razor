@@ -1,0 +1,167 @@
+@page "/import"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using GBS_Web.Data
+@using GBS_Web.Services
+@using Oracle.ManagedDataAccess.Client
+@inject EquipamentoRepository Repository
+@inject IConfiguration Configuration
+
+<PageTitle>Import</PageTitle>
+
+<h1>Import</h1>
+
+<p class="text-muted">Upload an .xlsx spreadsheet. Every worksheet is read the same way (no per-sheet rules) and each row is upserted by Internal UID — an existing UID updates that equipment, a new one inserts it.</p>
+
+<div class="mb-3" style="max-width: 500px;">
+    <InputFile OnChange="OnFileSelected" accept=".xlsx" class="form-control" />
+</div>
+
+@if (_fileName is not null)
+{
+    <p>Selected: <strong>@_fileName</strong> (@_rowCount rows read across @_sheetCount sheet(s))</p>
+    <button class="btn btn-primary mb-3" disabled="@_importing" @onclick="RunImportAsync">
+        @(_importing ? "Importing..." : "Import")
+    </button>
+}
+
+@if (_parseErrors.Count > 0)
+{
+    <div class="alert alert-warning">
+        <strong>Sheet read errors:</strong>
+        <ul class="mb-0">
+            @foreach (var err in _parseErrors)
+            {
+                <li>@err</li>
+            }
+        </ul>
+    </div>
+}
+
+@if (_result is not null)
+{
+    <div class="alert @(_result.TotalErros > 0 ? "alert-warning" : "alert-success")">
+        Import completed: @_result.TotalInseridos inserted, @_result.TotalAtualizados updated,
+        @_result.TotalSkipped skipped, @_result.TotalErros errors.
+    </div>
+
+    @if (_result.Erros.Count > 0)
+    {
+        <h6>Errors</h6>
+        <ul>
+            @foreach (var err in _result.Erros)
+            {
+                <li>@err</li>
+            }
+        </ul>
+    }
+
+    @if (_result.Skipped.Count > 0)
+    {
+        <h6>Skipped</h6>
+        <ul>
+            @foreach (var s in _result.Skipped)
+            {
+                <li>@s</li>
+            }
+        </ul>
+    }
+}
+
+@code {
+    private string? _fileName;
+    private int _rowCount;
+    private int _sheetCount;
+    private List<string> _parseErrors = new();
+    private List<Models.Equipamento> _equipamentos = new();
+    private bool _importing;
+    private ImportSummary? _result;
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        _result = null;
+        _parseErrors = new();
+        _fileName = e.File.Name;
+
+        using var stream = e.File.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024);
+        using var memory = new MemoryStream();
+        await stream.CopyToAsync(memory);
+        memory.Position = 0;
+
+        var parsed = ExcelImportService.ReadWorkbook(memory);
+        _equipamentos = parsed.Equipamentos;
+        _rowCount = parsed.TotalLinhasLidas;
+        _sheetCount = parsed.TotalAbasProcessadas;
+        _parseErrors = parsed.Erros;
+    }
+
+    private async Task RunImportAsync()
+    {
+        if (_equipamentos.Count == 0)
+        {
+            _result = new ImportSummary();
+            return;
+        }
+
+        _importing = true;
+        var summary = new ImportSummary();
+
+        var connectionString = OracleConnectionFactory.BuildConnectionString(Configuration);
+        using var connection = new OracleConnection(connectionString);
+        await connection.OpenAsync();
+        using var transaction = connection.BeginTransaction();
+
+        var rowNum = 0;
+        try
+        {
+            foreach (var equip in _equipamentos)
+            {
+                rowNum++;
+
+                if (string.IsNullOrWhiteSpace(equip.InternalUid))
+                {
+                    summary.TotalSkipped++;
+                    summary.Skipped.Add($"Row {rowNum}: skipped — Internal UID is empty");
+                    continue;
+                }
+
+                try
+                {
+                    var outcome = await Repository.UpsertAsync(connection, transaction, equip);
+                    if (outcome == "INSERTED") summary.TotalInseridos++;
+                    else summary.TotalAtualizados++;
+                }
+                catch (Exception ex)
+                {
+                    summary.TotalErros++;
+                    summary.Erros.Add($"UID {equip.InternalUid}: {ex.Message}");
+                }
+            }
+
+            await transaction.CommitAsync();
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync();
+            summary.Erros.Add($"Import rolled back: {ex.Message}");
+        }
+        finally
+        {
+            _importing = false;
+        }
+
+        _result = summary;
+    }
+
+    private class ImportSummary
+    {
+        public int TotalInseridos { get; set; }
+        public int TotalAtualizados { get; set; }
+        public int TotalSkipped { get; set; }
+        public int TotalErros { get; set; }
+        public List<string> Erros { get; set; } = new();
+        public List<string> Skipped { get; set; } = new();
+    }
+}
