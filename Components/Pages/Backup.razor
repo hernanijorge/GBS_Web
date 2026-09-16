@@ -1,0 +1,103 @@
+@page "/backup"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using GBS_Web.Data
+@inject BackupRepository Repository
+
+<PageTitle>Backup</PageTitle>
+
+<h1>Backup</h1>
+
+<div class="d-flex gap-2 mb-3 align-items-center">
+    <button class="btn btn-primary" disabled="@_running" @onclick="RunBackupAsync">
+        @(_running ? "Running..." : "Run Backup Now")
+    </button>
+    <button class="btn btn-outline-secondary" @onclick="LoadAsync">Refresh</button>
+</div>
+
+@if (_statusMessage is not null)
+{
+    <div class="alert @(_statusIsError ? "alert-danger" : "alert-success")">@_statusMessage</div>
+}
+
+@if (_loading)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_logs.Count == 0)
+{
+    <p><em>No backup history found.</em></p>
+}
+else
+{
+    <table class="table table-striped table-hover">
+        <thead>
+            <tr><th>Date/Time</th><th>Dump File</th><th>Status</th><th>Message</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var log in _logs)
+            {
+                <tr>
+                    <td>@log.DataExecucao.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                    <td>@log.ArquivoDmp</td>
+                    <td>
+                        <span class="badge @(log.Status == "SUCCESS" ? "bg-success" : "bg-danger")">@log.Status</span>
+                    </td>
+                    <td>@log.Mensagem</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Models.BackupLog> _logs = new();
+    private bool _loading = true;
+    private bool _running;
+    private string? _statusMessage;
+    private bool _statusIsError;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _logs = await Repository.GetLogAsync();
+        _loading = false;
+    }
+
+    private async Task RunBackupAsync()
+    {
+        _running = true;
+        _statusMessage = "Running backup... this may take a moment.";
+        _statusIsError = false;
+        StateHasChanged();
+
+        try
+        {
+            var result = await Repository.RunBackupAsync();
+            if (result.Success)
+            {
+                _statusMessage = $"Backup completed successfully: {result.DumpName}";
+                _statusIsError = false;
+            }
+            else
+            {
+                _statusMessage = $"Backup failed (exit code {result.ExitCode}). See history below for details.";
+                _statusIsError = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            _statusMessage = $"Error running backup: {ex.Message}";
+            _statusIsError = true;
+        }
+        finally
+        {
+            _running = false;
+        }
+
+        await LoadAsync();
+    }
+}

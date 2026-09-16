@@ -20,6 +20,7 @@ builder.Services.AddSingleton<RemessaRepository>();
 builder.Services.AddSingleton<UpgradeRepository>();
 builder.Services.AddSingleton<ClienteRepository>();
 builder.Services.AddSingleton<InvoiceRepository>();
+builder.Services.AddSingleton<BackupRepository>();
 
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
