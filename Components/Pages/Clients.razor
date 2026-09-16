@@ -1,0 +1,226 @@
+@page "/clients"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using GBS_Web.Data
+@using Cliente = GBS_Web.Models.Cliente
+@inject ClienteRepository Repository
+
+<PageTitle>Clients</PageTitle>
+
+<h1>Clients</h1>
+
+<div class="d-flex gap-2 mb-3">
+    <input class="form-control" style="max-width: 320px;" placeholder="Search name, doc, email..."
+           @bind="_search" @bind:event="oninput" @onkeyup="OnSearchKeyUp" />
+    <button class="btn btn-outline-secondary" @onclick="LoadAsync">Search</button>
+    <button class="btn btn-primary ms-auto" @onclick="OpenNewModal">+ New Client</button>
+</div>
+
+@if (_loading)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_clients.Count == 0)
+{
+    <p><em>No clients found.</em></p>
+}
+else
+{
+    <table class="table table-striped table-hover">
+        <thead>
+            <tr><th>Name</th><th>Document</th><th>Email</th><th>Phone</th><th>City</th><th>Active</th><th></th></tr>
+        </thead>
+        <tbody>
+            @foreach (var c in _clients)
+            {
+                <tr>
+                    <td>@c.NomeExibicao</td>
+                    <td>@c.Documento</td>
+                    <td>@c.Email</td>
+                    <td>@c.Telefone</td>
+                    <td>@c.Cidade</td>
+                    <td>@c.Ativo</td>
+                    <td><button class="btn btn-sm btn-outline-secondary" @onclick="() => OpenEditModal(c)">Edit</button></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@if (_statusMessage is not null)
+{
+    <div class="alert alert-success">@_statusMessage</div>
+}
+
+@if (_showModal)
+{
+    <div class="modal d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(_editing.IdCliente == 0 ? "New Client" : "Edit Client")</h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Name / Razão Social *</label>
+                            <input class="form-control" @bind="_editing.NomeRazao" />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Trade Name</label>
+                            <input class="form-control" @bind="_editing.NomeFantasia" />
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Document (Tax ID)</label>
+                            <input class="form-control" @bind="_editing.Documento" />
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Email</label>
+                            <input class="form-control" @bind="_editing.Email" />
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Phone</label>
+                            <input class="form-control" @bind="_editing.Telefone" />
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Address 1</label>
+                            <input class="form-control" @bind="_editing.Endereco1" />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Address 2</label>
+                            <input class="form-control" @bind="_editing.Endereco2" />
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">City</label>
+                            <input class="form-control" @bind="_editing.Cidade" />
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">State</label>
+                            <input class="form-control" @bind="_editing.Estado" />
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Zip Code</label>
+                            <input class="form-control" @bind="_editing.ZipCode" />
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Country</label>
+                            <input class="form-control" @bind="_editing.Pais" />
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notes</label>
+                        <textarea class="form-control" @bind="_editing.Observacoes"></textarea>
+                    </div>
+                    @if (!string.IsNullOrEmpty(_validationError))
+                    {
+                        <div class="alert alert-warning">@_validationError</div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseModal">Cancel</button>
+                    <button type="button" class="btn btn-primary" disabled="@_saving" @onclick="SaveAsync">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Cliente> _clients = new();
+    private bool _loading = true;
+    private string _search = "";
+    private bool _showModal;
+    private bool _saving;
+    private string? _validationError;
+    private string? _statusMessage;
+    private Cliente _editing = new();
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _clients = await Repository.SearchAsync(string.IsNullOrWhiteSpace(_search) ? null : _search.Trim());
+        _loading = false;
+    }
+
+    private async Task OnSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await LoadAsync();
+    }
+
+    private void OpenNewModal()
+    {
+        _editing = new Cliente();
+        _validationError = null;
+        _showModal = true;
+    }
+
+    private void OpenEditModal(Cliente c)
+    {
+        _editing = new Cliente
+        {
+            IdCliente = c.IdCliente,
+            NomeRazao = c.NomeRazao,
+            NomeFantasia = c.NomeFantasia,
+            Documento = c.Documento,
+            Email = c.Email,
+            Telefone = c.Telefone,
+            Endereco1 = c.Endereco1,
+            Endereco2 = c.Endereco2,
+            Cidade = c.Cidade,
+            Estado = c.Estado,
+            ZipCode = c.ZipCode,
+            Pais = c.Pais,
+            Ativo = c.Ativo,
+            Observacoes = c.Observacoes
+        };
+        _validationError = null;
+        _showModal = true;
+    }
+
+    private void CloseModal() => _showModal = false;
+
+    private async Task SaveAsync()
+    {
+        _validationError = null;
+        if (string.IsNullOrWhiteSpace(_editing.NomeRazao))
+        {
+            _validationError = "Name is required.";
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            if (_editing.IdCliente == 0)
+            {
+                await Repository.CreateAsync(_editing);
+                _statusMessage = $"Client \"{_editing.NomeRazao}\" created.";
+            }
+            else
+            {
+                await Repository.UpdateAsync(_editing);
+                _statusMessage = $"Client \"{_editing.NomeRazao}\" updated.";
+            }
+            _showModal = false;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _validationError = $"Error saving client: {ex.Message}";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}
