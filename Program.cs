@@ -21,6 +21,7 @@ builder.Services.AddSingleton<UpgradeRepository>();
 builder.Services.AddSingleton<ClienteRepository>();
 builder.Services.AddSingleton<InvoiceRepository>();
 builder.Services.AddSingleton<BackupRepository>();
+builder.Services.AddSingleton<UserRepository>();
 
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -32,6 +33,22 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
+
+// One-time seed: if TBL_APP_USER is empty, create the initial admin user
+// from the same env var that used to be compared in plain text, hashed on
+// the way in. Subsequent logins never touch this env var again.
+using (var scope = app.Services.CreateScope())
+{
+    var seedUsername = app.Configuration["AppLogin:Username"] ?? "admin";
+    var seedPassword = Environment.GetEnvironmentVariable("GBS_APP_PASSWORD");
+    if (string.IsNullOrEmpty(seedPassword))
+    {
+        throw new InvalidOperationException("Variável de ambiente GBS_APP_PASSWORD não definida.");
+    }
+
+    var userRepository = scope.ServiceProvider.GetRequiredService<UserRepository>();
+    await userRepository.EnsureSeedUserAsync(seedUsername, seedPassword);
+}
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
@@ -52,17 +69,9 @@ app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
-app.MapPost("/account/login", async (HttpContext http, [FromForm] string username, [FromForm] string password, [FromForm] string? returnUrl) =>
+app.MapPost("/account/login", async (HttpContext http, UserRepository userRepository, [FromForm] string username, [FromForm] string password, [FromForm] string? returnUrl) =>
 {
-    var expectedUser = app.Configuration["AppLogin:Username"] ?? "admin";
-    var expectedPassword = Environment.GetEnvironmentVariable("GBS_APP_PASSWORD");
-
-    if (string.IsNullOrEmpty(expectedPassword))
-    {
-        throw new InvalidOperationException("Variável de ambiente GBS_APP_PASSWORD não definida.");
-    }
-
-    if (username == expectedUser && password == expectedPassword)
+    if (await userRepository.ValidateCredentialsAsync(username, password))
     {
         var identity = new ClaimsIdentity(
             [new Claim(ClaimTypes.Name, username)],
