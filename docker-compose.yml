@@ -1,0 +1,24 @@
+# Reference / documentation only — NOT the validation path for this project.
+#
+# This dev machine has no Docker Desktop installed (deliberate: limited RAM,
+# already running the Oracle 10g XE instance, IDEs, etc.) and won't get one.
+# Image build + publish is verified via GitHub Actions
+# (.github/workflows/docker-build.yml) → GHCR, and the actual container run
+# is verified on the Oracle Cloud VM in Fase D.
+#
+# Keep this file for anyone who *does* have Docker Desktop locally (it needs
+# host.docker.internal to reach an Oracle instance running on their host —
+# that hostname only resolves under Docker Desktop, not on a plain Linux
+# Docker Engine host like the target VM).
+services:
+  gbs-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5080:8080"
+    env_file:
+      - .env.docker
+    environment:
+      - Oracle__DataSource=host.docker.internal:1521/XE
+    restart: unless-stopped

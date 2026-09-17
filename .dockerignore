@@ -1,0 +1,9 @@
+bin/
+obj/
+.vs/
+.git/
+.github/
+**/*.user
+docs/
+*.md
+.env.docker
