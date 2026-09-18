@@ -22,7 +22,8 @@ Histórico técnico da migração do GBS_Web (Blazor Server) do ambiente local p
 
 - Tenancy Always Free: `hernanijorge1`, home region **US East (Ashburn)**.
 - **Autonomous Database "GBS"** — Always Free, workload Transaction Processing.
-- **VM ARM A1.Flex** — 2 OCPU / 12GB RAM, Oracle Linux 9, IP público `129.80.215.94`. Acesso SSH confirmado via usuário `opc`.
+- **VM ARM A1.Flex** (`gbs-web-vm`) — 2 OCPU / 12GB RAM, Oracle Linux 9, IP público `129.80.215.94`. Acesso SSH confirmado via usuário `opc`.
+- VCN `vcn-20260917-2045` / Subnet `subnet-20260917-2042`, com a Default Security List associada.
 
 ## Decisão de conexão com o Autonomous DB
 
@@ -77,14 +78,51 @@ IDs originais preservados (sem regenerar via sequence); sequences ajustadas pro 
 
 As outras 6 tabelas do schema live (`TBL_CLIENTE`, `TBL_INVOICE`, `TBL_INVOICE_ITEM`, `TBL_COMPONENT`, `TBL_BACKUP_LOG`, `TBL_APP_USER`) tiveram o **schema criado** no Autonomous DB, mas os **dados não foram migrados** — eram 13 linhas de dado de teste (cliente "ACME TEST CORP", 1 invoice, 3 componentes, histórico de backup), identificadas como dado de desenvolvimento e descartadas deliberadamente antes de apontar o GBS_Web pro banco de produção novo.
 
-## Nota de segurança
+## Fase C — Conexão com Autonomous DB via TLS ✅
 
-Durante o processo, a senha do usuário ADMIN do Autonomous Database apareceu momentaneamente em texto puro num terminal PowerShell capturado em screenshot compartilhado. Recomendada (e presumida feita) a rotação dessa senha no console OCI logo em seguida. Lição registrada: gravar segredos em arquivo local lido programaticamente (nunca digitado/colado visível em tela), preferencialmente via `Read-Host -AsSecureString`.
+- `OracleConnectionFactory.cs` suporta 3 modos via variável de ambiente `GBS_ORACLE_TARGET`:
+  - `LOCAL` (padrão, comportamento inalterado)
+  - `ADB_TLS` (novo, **validado**) — TLS sem wallet, mesmo formato de connect string usado com sucesso na migração do Passo 0.
+  - `ADB_WALLET` (documentado no código, **não testado**) — caminho alternativo caso mTLS seja reativado no futuro.
+- `appsettings.json` ganhou `AdbHost` / `AdbServiceName` / `AdbTnsAlias` (endpoint/nome de serviço, não são segredos).
+- Desvio consciente do plano original (que previa wallet/mTLS): como o mTLS foi desabilitado no Passo 0 pra resolver o bloqueio de conexão, o modo TLS-only (`ADB_TLS`) virou o caminho real e testado.
+
+**Validação end-to-end** (aplicação inteira, não só uma query isolada):
+- GBS_Web completo rodando com `GBS_ORACLE_TARGET=ADB_TLS` numa porta separada (5081).
+- Startup limpo — seed do `TBL_APP_USER` rodou query real contra o Autonomous DB sem erro.
+- Login via `curl` (independente de navegador) → sucesso.
+- Dashboard retornou os dados migrados corretos: 661 em estoque, 595 em boa condição, 19 upgrades (30d) — batendo exatamente com os números do Passo 0.
+
+Commit e push feitos (`fca789a`).
+
+### Achados de segurança tratados durante a Fase C
+
+1. **Chave SSH privada solta no repo**: `ssh-key-2026-09-18.key` (par de chaves da VM, gerado preparando a Fase D) estava na raiz do repositório, fora do `.gitignore`.
+   - `.gitignore` corrigido pra proteger `*.key`/`*.pem`/`*.ppk`.
+   - Verificação de histórico: `git log --all --full-history` pros nomes de arquivo e por extensão, em todos os 8 commits/todas as refs, incluindo `git stash list` — **nenhum arquivo de chave jamais foi commitado**. Risco confirmado como baixo (nunca exposto no remoto).
+   - Mesmo assim, movido por boa prática pra `C:\Users\herna\.ssh\ssh-key-2026-09-18.key`, fora do repo. A chave tinha ACL restritiva (`Read, Synchronize` só pro usuário, sem Write/Delete — hardening equivalente a `chmod 600`) que bloqueou até o `Move-Item` do próprio usuário; resolvido via `icacls` (grant temporário de Full Control → move → reaplicação da mesma restrição de leitura no novo local).
+2. **Senha do ADMIN do Autonomous DB exposta em screenshot** (ocorrido durante o Passo 0, registrado aqui por continuidade): apareceu em texto puro num terminal PowerShell capturado em print. Rotação de senha recomendada. Lição aplicada: gravar segredos em arquivo lido programaticamente via `Read-Host -AsSecureString`, nunca digitado visível em tela.
+
+### Organização do repositório local
+
+Identificada duplicidade de pastas: o GitHub Desktop estava acompanhando `C:\Users\herna\Desktop\GBS_Web` (clone antigo/parado), enquanto o desenvolvimento real (via Claude Code CLI) acontece em `C:\GBS\GBS_Web` — por isso os commits não apareciam no GitHub Desktop. Corrigido apontando o GitHub Desktop pra `C:\GBS\GBS_Web` (Add Existing Repository) e removendo a pasta antiga da lista (sem apagar do disco).
+
+## Fase D — Deploy na VM (em andamento)
+
+- **Networking liberado**: duas Ingress Rules adicionadas na Default Security List da subnet (`subnet-20260917-2042`, VCN `vcn-20260917-2045`) — `0.0.0.0/0` TCP porta 80 e `0.0.0.0/0` TCP porta 443.
+- **Decisão de domínio/HTTPS**: ainda não há domínio apontando pro IP `129.80.215.94`. Como o Let's Encrypt (HTTPS automático via Caddy) exige domínio real (não emite certificado pra IP puro), decidido rodar HTTP por enquanto — a troca pra Let's Encrypt fica documentada como pendência pra quando houver um domínio registrado.
+- Próximo: instalar Docker na VM ARM (`129.80.215.94`, usuário `opc`, SSH confirmado) e publicar a imagem `ghcr.io/hernanijorge/gbs_web:latest` já disponível no GHCR, com Caddy servindo HTTP.
+
+## Notas operacionais — Always Free (custo e inatividade)
+
+Recursos Always Free (VM e Autonomous DB) não geram custo independente de uptime. Únicos riscos são de **reclamação por inatividade**, não de cobrança:
+- VM: reclamável se CPU, rede e memória ficarem todos abaixo de 20% por 7 dias seguidos.
+- Autonomous DB: para automaticamente após 7 dias sem conexão (reversível, restart manual); se ficar parada por 90 dias corridos sem restart, pode ser deletada permanentemente.
+- Uso ativo do projeto (como o atual, quase diário) mantém ambos fora de risco.
 
 ## Próximos passos
 
-- **Fase C** — conectar o GBS_Web ao Autonomous DB via TLS sem wallet (connection string `OracleCloud` em `appsettings.json`, via variável de ambiente). Bloqueios de rede já resolvidos; falta validar a aplicação em si rodando contra o banco na nuvem.
-- **Fase D** — instalar Docker na VM ARM (`129.80.215.94`, usuário `opc`, SSH confirmado) e publicar a imagem `ghcr.io/hernanijorge/gbs_web:latest` já disponível no GHCR.
+- **Fase D** — concluir instalação do Docker na VM + Caddy servindo o container em HTTP; migrar pra HTTPS via Let's Encrypt assim que houver domínio.
 
 ---
-*Última atualização: 17/09/2026 — Passo 0 concluído.*
+*Última atualização: 18/09/2026 — Fase C concluída, Fase D em andamento (networking liberado).*
