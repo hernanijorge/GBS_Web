@@ -8,6 +8,11 @@
 .env.*
 !.env.docker.example
 
+# SSH keys / secrets — never commit these
+*.key
+*.pem
+*.ppk
+
 # User-specific files
 *.rsuser
 *.suo
