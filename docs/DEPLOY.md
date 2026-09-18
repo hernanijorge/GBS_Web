@@ -1,6 +1,6 @@
 # Deploy — Oracle Cloud VM (Fase D)
 
-Passos manuais pra reproduzir (ou refazer do zero) o deploy do GBS_Web na VM Always Free da Oracle Cloud. Estado atual documentado em [`DEPLOY_LOG.md`](DEPLOY_LOG.md).
+Passos manuais pra reproduzir (ou refazer do zero) o deploy do GBS_Web na VM Always Free da Oracle Cloud. Estado atual documentado em [`DEPLOY_LOG.md`](../DEPLOY_LOG.md).
 
 ## Infraestrutura
 
