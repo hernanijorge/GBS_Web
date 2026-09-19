@@ -73,12 +73,12 @@ else
 {
     <div class="modal d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
         <div class="modal-dialog modal-lg">
-            <div class="modal-content">
+            <div class="modal-content" style="max-height: 90vh; display: flex; flex-direction: column;">
                 <div class="modal-header">
                     <h5 class="modal-title">Register Upgrade</h5>
                     <button type="button" class="btn-close" @onclick="CloseNewModal"></button>
                 </div>
-                <div class="modal-body">
+                <div class="modal-body" style="flex: 1 1 auto; overflow-y: auto; min-height: 0;">
                     <h6>Equipment</h6>
                     @if (_selectedEquip is null)
                     {
@@ -89,25 +89,27 @@ else
                         </div>
                         @if (_searchResults.Count > 0)
                         {
-                            <table class="table table-sm table-bordered">
-                                <thead>
-                                    <tr><th>UID</th><th>Manufacturer</th><th>Model</th><th>RAM</th><th>Storage</th><th>Status</th><th></th></tr>
-                                </thead>
-                                <tbody>
-                                    @foreach (var eq in _searchResults)
-                                    {
-                                        <tr>
-                                            <td>@eq.InternalUid</td>
-                                            <td>@eq.Manufacturer</td>
-                                            <td>@eq.Model</td>
-                                            <td>@eq.RamGb</td>
-                                            <td>@eq.StorageGb</td>
-                                            <td>@eq.Status</td>
-                                            <td><button class="btn btn-sm btn-outline-primary" @onclick="() => SelectEquipment(eq)">Select</button></td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
+                            <div style="max-height: 300px; overflow-y: auto;">
+                                <table class="table table-sm table-bordered mb-0">
+                                    <thead>
+                                        <tr><th>UID</th><th>Manufacturer</th><th>Model</th><th>RAM</th><th>Storage</th><th>Status</th><th></th></tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var eq in _searchResults)
+                                        {
+                                            <tr>
+                                                <td>@eq.InternalUid</td>
+                                                <td>@eq.Manufacturer</td>
+                                                <td>@eq.Model</td>
+                                                <td>@eq.RamGb</td>
+                                                <td>@eq.StorageGb</td>
+                                                <td>@eq.Status</td>
+                                                <td><button class="btn btn-sm btn-outline-primary" @onclick="() => SelectEquipment(eq)">Select</button></td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
                         }
                     }
                     else
