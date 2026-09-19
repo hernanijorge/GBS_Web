@@ -22,6 +22,7 @@ builder.Services.AddSingleton<ClienteRepository>();
 builder.Services.AddSingleton<InvoiceRepository>();
 builder.Services.AddSingleton<BackupRepository>();
 builder.Services.AddSingleton<UserRepository>();
+builder.Services.AddSingleton<HistoryRepository>();
 
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -99,6 +100,110 @@ app.MapGet("/invoices/{id:int}/pdf", async (int id, InvoiceRepository invoiceRep
 
     var pdfBytes = InvoicePdfGenerator.Generate(data, null);
     return Results.File(pdfBytes, "application/pdf", $"{data.Invoice.InvoiceNumber}.pdf");
+}).RequireAuthorization();
+
+app.MapGet("/shipments/{remessaRef}/pdf", async (string remessaRef, RemessaRepository remessaRepository) =>
+{
+    var items = await remessaRepository.GetItemsForReportAsync(remessaRef);
+    var pdfBytes = ShipmentReportGenerator.GeneratePdf(items, remessaRef);
+    return Results.File(pdfBytes, "application/pdf", $"{remessaRef}.pdf");
+}).RequireAuthorization();
+
+app.MapGet("/shipments/{remessaRef}/excel", async (string remessaRef, RemessaRepository remessaRepository) =>
+{
+    var items = await remessaRepository.GetItemsForReportAsync(remessaRef);
+    var excelBytes = ShipmentReportGenerator.GenerateExcel(items, remessaRef);
+    return Results.File(excelBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"{remessaRef}.xlsx");
+}).RequireAuthorization();
+
+// Reports operate on the same search/status filter the Inventory page has
+// active — the web equivalent of the desktop's "current filter" report mode
+// (ColetarItensRelatorio's fallback when no custom list/checkbox selection is
+// active). See docs/DEPLOY_LOG.md Fase E for why the custom-list/checkbox
+// modes weren't ported.
+app.MapGet("/inventory/report/pdf", async (string? search, string? status, EquipamentoRepository equipamentoRepository) =>
+{
+    var items = await equipamentoRepository.GetAllAsync(search, status);
+    var pdfBytes = InventoryReportGenerator.GeneratePdf(items);
+    return Results.File(pdfBytes, "application/pdf", $"InventoryReport_{DateTime.Now:yyyyMMdd_HHmmss}.pdf");
+}).RequireAuthorization();
+
+app.MapGet("/inventory/report/excel", async (string? search, string? status, EquipamentoRepository equipamentoRepository) =>
+{
+    var items = await equipamentoRepository.GetAllAsync(search, status);
+    var excelBytes = InventoryReportGenerator.GenerateExcel(items);
+    return Results.File(excelBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"InventoryReport_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx");
+}).RequireAuthorization();
+
+app.MapGet("/components/report/pdf", async (ComponentRepository componentRepository) =>
+{
+    var items = await componentRepository.GetAllAsync();
+    var pdfBytes = ComponentReportGenerator.GeneratePdf(items);
+    return Results.File(pdfBytes, "application/pdf", $"ComponentsReport_{DateTime.Now:yyyyMMdd_HHmmss}.pdf");
+}).RequireAuthorization();
+
+app.MapGet("/components/report/excel", async (ComponentRepository componentRepository) =>
+{
+    var items = await componentRepository.GetAllAsync();
+    var excelBytes = ComponentReportGenerator.GenerateExcel(items);
+    return Results.File(excelBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"ComponentsReport_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx");
+}).RequireAuthorization();
+
+app.MapGet("/components/summary/pdf", async (ComponentRepository componentRepository) =>
+{
+    var items = await componentRepository.GetSummaryAsync();
+    var pdfBytes = ComponentSummaryReportGenerator.GeneratePdf(items);
+    return Results.File(pdfBytes, "application/pdf", $"ComponentSummary_{DateTime.Now:yyyyMMdd_HHmmss}.pdf");
+}).RequireAuthorization();
+
+app.MapGet("/components/summary/excel", async (ComponentRepository componentRepository) =>
+{
+    var items = await componentRepository.GetSummaryAsync();
+    var excelBytes = ComponentSummaryReportGenerator.GenerateExcel(items);
+    return Results.File(excelBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"ComponentSummary_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx");
+}).RequireAuthorization();
+
+app.MapGet("/upgrades/report/excel", async (int? days, UpgradeRepository upgradeRepository) =>
+{
+    var rows = await upgradeRepository.GetUpgradesForClientReportAsync(days ?? 90);
+    var excelBytes = UpgradeClientReportGenerator.GenerateExcel(rows);
+    return Results.File(excelBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"UpgradeReport_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx");
+}).RequireAuthorization();
+
+app.MapGet("/inventory/{id:int}/history/pdf", async (int id, EquipamentoRepository equipamentoRepository, HistoryRepository historyRepository) =>
+{
+    var eq = await equipamentoRepository.GetByIdAsync(id);
+    if (eq is null) return Results.NotFound();
+    var upgrades = await historyRepository.GetUpgradesAsync(id);
+    var shipments = await historyRepository.GetShipmentsAsync(id);
+    var pdfBytes = HistoryReportGenerator.GeneratePdf(eq, upgrades, shipments);
+    return Results.File(pdfBytes, "application/pdf", $"History_{eq.InternalUid}.pdf");
+}).RequireAuthorization();
+
+app.MapGet("/inventory/{id:int}/history/excel", async (int id, EquipamentoRepository equipamentoRepository, HistoryRepository historyRepository) =>
+{
+    var eq = await equipamentoRepository.GetByIdAsync(id);
+    if (eq is null) return Results.NotFound();
+    var upgrades = await historyRepository.GetUpgradesAsync(id);
+    var shipments = await historyRepository.GetShipmentsAsync(id);
+    var excelBytes = HistoryReportGenerator.GenerateExcel(eq, upgrades, shipments);
+    return Results.File(excelBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"History_{eq.InternalUid}.xlsx");
+}).RequireAuthorization();
+
+app.MapGet("/import/quality/pdf", async (string? uids, string? file, EquipamentoRepository equipamentoRepository) =>
+{
+    var uidList = (uids ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+    var items = await equipamentoRepository.GetForImportAnalysisAsync(uidList);
+    var pdfBytes = ImportQualityReportGenerator.GeneratePdf(items, file ?? "");
+    return Results.File(pdfBytes, "application/pdf", $"ImportQuality_{DateTime.Now:yyyyMMdd_HHmmss}.pdf");
+}).RequireAuthorization();
+
+app.MapGet("/import/quality/excel", async (string? uids, string? file, EquipamentoRepository equipamentoRepository) =>
+{
+    var uidList = (uids ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+    var items = await equipamentoRepository.GetForImportAnalysisAsync(uidList);
+    var excelBytes = ImportQualityReportGenerator.GenerateExcel(items, file ?? "");
+    return Results.File(excelBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"ImportQuality_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx");
 }).RequireAuthorization();
 
 app.Run();

@@ -79,6 +79,69 @@ public class UpgradeRepository
         return list;
     }
 
+    // Port of clsLeituraUpgrade.selecionarUpgradesComCliente — PACK_UPGRADE's recent-
+    // upgrades proc doesn't return MODEL/SERIAL_NUMBER or the shipment recipient
+    // (CUSTOMER), so this is plain SQL, same joins as the desktop's own query.
+    public async Task<List<Models.UpgradeReportRow>> GetUpgradesForClientReportAsync(int days)
+    {
+        var list = new List<Models.UpgradeReportRow>();
+
+        using var connection = new OracleConnection(_connectionString);
+        await connection.OpenAsync();
+
+        using var command = connection.CreateCommand();
+        command.CommandType = CommandType.Text;
+        command.CommandText =
+            "SELECT NVL(R.DESTINATARIO, 'Unassigned')  AS CUSTOMER, " +
+            "       E.INTERNAL_UID, " +
+            "       E.MODEL, " +
+            "       E.SERIAL_NUMBER, " +
+            "       U.DATA_UPGRADE, " +
+            "       U.TIPO_UPGRADE                      AS COMPONENT_TYPE, " +
+            "       CASE U.TIPO_UPGRADE " +
+            "           WHEN 'RAM' THEN TO_CHAR(U.RAM_ANTERIOR_GB)     || ' GB' " +
+            "           WHEN 'SSD' THEN TO_CHAR(U.STORAGE_ANTERIOR_GB) || ' GB' " +
+            "           WHEN 'HDD' THEN TO_CHAR(U.STORAGE_ANTERIOR_GB) || ' GB' " +
+            "           ELSE NULL " +
+            "       END                                  AS VALUE_BEFORE, " +
+            "       CASE U.TIPO_UPGRADE " +
+            "           WHEN 'RAM' THEN CASE WHEN U.RAM_NOVA_GB     > 0 THEN TO_CHAR(U.RAM_NOVA_GB)     || ' GB' END " +
+            "           WHEN 'SSD' THEN CASE WHEN U.STORAGE_NOVO_GB > 0 THEN TO_CHAR(U.STORAGE_NOVO_GB) || ' GB' END " +
+            "           WHEN 'HDD' THEN CASE WHEN U.STORAGE_NOVO_GB > 0 THEN TO_CHAR(U.STORAGE_NOVO_GB) || ' GB' END " +
+            "           ELSE NULL " +
+            "       END                                  AS VALUE_AFTER, " +
+            "       U.TECNICO                            AS TECHNICIAN, " +
+            "       U.OBSERVACAO                         AS NOTES " +
+            "  FROM TBL_EQUIPAMENTO_UPGRADE U " +
+            "  JOIN TBL_EQUIPAMENTO E ON E.ID_EQUIPAMENTO = U.ID_EQUIPAMENTO " +
+            "  LEFT JOIN TBL_REMESSA_ITEM RI ON RI.ID_EQUIPAMENTO = E.ID_EQUIPAMENTO " +
+            "  LEFT JOIN TBL_REMESSA      R  ON R.ID_REMESSA      = RI.ID_REMESSA " +
+            " WHERE U.DATA_UPGRADE >= SYSDATE - :V_DIAS " +
+            " ORDER BY NVL(R.DESTINATARIO, 'Unassigned'), E.INTERNAL_UID, U.DATA_UPGRADE";
+        command.BindByName = true;
+        AddParam(command, "V_DIAS", OracleDbType.Int32, days);
+
+        using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            list.Add(new Models.UpgradeReportRow
+            {
+                Customer = reader["CUSTOMER"] as string ?? "Unassigned",
+                InternalUid = reader["INTERNAL_UID"] as string ?? "",
+                Model = reader["MODEL"] as string,
+                SerialNumber = reader["SERIAL_NUMBER"] as string,
+                DataUpgrade = reader["DATA_UPGRADE"] is DBNull ? null : Convert.ToDateTime(reader["DATA_UPGRADE"]),
+                ComponentType = reader["COMPONENT_TYPE"] as string ?? "",
+                ValueBefore = reader["VALUE_BEFORE"] as string,
+                ValueAfter = reader["VALUE_AFTER"] as string,
+                Technician = reader["TECHNICIAN"] as string,
+                Notes = reader["NOTES"] as string
+            });
+        }
+
+        return list;
+    }
+
     // Port of clsLeituraUpgrade.selecionarOrigensDistintas.
     public async Task<List<string>> GetDistinctOriginsAsync()
     {

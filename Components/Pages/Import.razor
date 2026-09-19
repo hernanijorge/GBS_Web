@@ -70,6 +70,53 @@
     }
 }
 
+@if (_analysis.Count > 0)
+{
+    <hr />
+    <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+        <h5 class="mb-0">Import Analysis</h5>
+        <div class="d-flex align-items-center gap-3">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="issuesOnly" @bind="_showIssuesOnly" />
+                <label class="form-check-label" for="issuesOnly">Show issues only</label>
+            </div>
+            <a class="btn btn-outline-secondary btn-sm" href="@ReportUrl("pdf")" target="_blank">Generate Report (PDF)</a>
+            <a class="btn btn-outline-secondary btn-sm" href="@ReportUrl("excel")" target="_blank">Generate Report (Excel)</a>
+        </div>
+    </div>
+
+    <table class="table table-sm table-bordered">
+        <thead>
+            <tr>
+                <th>Internal UID</th><th>Manufacturer</th><th>Model</th><th>Serial Number</th>
+                <th>Battery Condition</th><th>Status</th><th>Batch</th><th>Problem?</th>
+                <th>Issue Reason</th><th>Observation</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var row in _analysis.Where(r => !_showIssuesOnly || r.Problem))
+            {
+                <tr class="@(row.Problem ? "table-danger" : "")">
+                    <td>@row.InternalUid</td>
+                    <td>@row.Manufacturer</td>
+                    <td>@row.Model</td>
+                    <td>@row.SerialNumber</td>
+                    <td>@row.ConditionStatus</td>
+                    <td>@row.Status</td>
+                    <td>@row.SourceBatch</td>
+                    <td><input type="checkbox" @bind="row.Problem" /></td>
+                    <td>@row.IssueReason</td>
+                    <td>@row.Observation</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <p class="text-muted">
+        Total: @_analysis.Count | OK / According to spreadsheet: @_analysis.Count(r => !r.Problem) |
+        Issues: @_analysis.Count(r => r.Problem)
+    </p>
+}
+
 @code {
     private string? _fileName;
     private int _rowCount;
@@ -78,6 +125,8 @@
     private List<Models.Equipamento> _equipamentos = new();
     private bool _importing;
     private ImportSummary? _result;
+    private List<Models.ImportAnalysisRow> _analysis = new();
+    private bool _showIssuesOnly;
 
     private async Task OnFileSelected(InputFileChangeEventArgs e)
     {
@@ -107,6 +156,7 @@
 
         _importing = true;
         var summary = new ImportSummary();
+        var uidsImported = new List<string>();
 
         var connectionString = OracleConnectionFactory.BuildConnectionString(Configuration);
         using var connection = new OracleConnection(connectionString);
@@ -114,6 +164,7 @@
         using var transaction = connection.BeginTransaction();
 
         var rowNum = 0;
+        var committed = false;
         try
         {
             foreach (var equip in _equipamentos)
@@ -132,6 +183,7 @@
                     var outcome = await Repository.UpsertAsync(connection, transaction, equip);
                     if (outcome == "INSERTED") summary.TotalInseridos++;
                     else summary.TotalAtualizados++;
+                    uidsImported.Add(equip.InternalUid);
                 }
                 catch (Exception ex)
                 {
@@ -141,6 +193,7 @@
             }
 
             await transaction.CommitAsync();
+            committed = true;
         }
         catch (Exception ex)
         {
@@ -153,6 +206,20 @@
         }
 
         _result = summary;
+
+        // Port of frmImportacao.vb's CarregarGridAnalise — re-fetch the just-imported
+        // rows and flag data-quality issues.
+        _analysis = committed && uidsImported.Count > 0
+            ? await Repository.GetForImportAnalysisAsync(uidsImported)
+            : new();
+        _showIssuesOnly = false;
+    }
+
+    private string ReportUrl(string format)
+    {
+        var uids = string.Join(",", _analysis.Select(r => Uri.EscapeDataString(r.InternalUid)));
+        var file = Uri.EscapeDataString(_fileName ?? "");
+        return $"/import/quality/{format}?uids={uids}&file={file}";
     }
 
     private class ImportSummary

@@ -83,6 +83,50 @@ public class ComponentRepository
         await command.ExecuteNonQueryAsync();
     }
 
+    // Port of clsReadComponent.vb's selectSummary() — plain SQL, no existing
+    // package proc does this aggregation.
+    public async Task<List<Models.ComponentSummary>> GetSummaryAsync()
+    {
+        var list = new List<Models.ComponentSummary>();
+
+        using var connection = new OracleConnection(_connectionString);
+        await connection.OpenAsync();
+
+        using var command = connection.CreateCommand();
+        command.CommandType = CommandType.Text;
+        command.CommandText =
+            "SELECT COMPONENT_TYPE, CAPACITY_GB, GENERATION, SPEED_MHZ, CPU, STORAGE_GB, " +
+            "       COUNT(*) AS TOTAL, " +
+            "       SUM(CASE WHEN STATUS='IN_STOCK'  THEN 1 ELSE 0 END) AS IN_STOCK, " +
+            "       SUM(CASE WHEN STATUS='INSTALLED' THEN 1 ELSE 0 END) AS INSTALLED, " +
+            "       SUM(CASE WHEN STATUS='SOLD'      THEN 1 ELSE 0 END) AS SOLD, " +
+            "       SUM(CASE WHEN STATUS='SCRAPPED'  THEN 1 ELSE 0 END) AS SCRAPPED " +
+            "  FROM TBL_COMPONENT " +
+            " GROUP BY COMPONENT_TYPE, CAPACITY_GB, GENERATION, SPEED_MHZ, CPU, STORAGE_GB " +
+            " ORDER BY COMPONENT_TYPE, CAPACITY_GB, GENERATION, SPEED_MHZ, CPU, STORAGE_GB";
+
+        using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            list.Add(new Models.ComponentSummary
+            {
+                ComponentType = reader["COMPONENT_TYPE"] as string ?? "",
+                CapacityGb = Convert.ToInt32(reader["CAPACITY_GB"]),
+                Generation = reader["GENERATION"] as string,
+                SpeedMhz = reader["SPEED_MHZ"] is DBNull ? null : Convert.ToInt32(reader["SPEED_MHZ"]),
+                Cpu = reader["CPU"] as string,
+                StorageGb = reader["STORAGE_GB"] is DBNull ? null : Convert.ToInt32(reader["STORAGE_GB"]),
+                Total = Convert.ToInt32(reader["TOTAL"]),
+                InStock = Convert.ToInt32(reader["IN_STOCK"]),
+                Installed = Convert.ToInt32(reader["INSTALLED"]),
+                Sold = Convert.ToInt32(reader["SOLD"]),
+                Scrapped = Convert.ToInt32(reader["SCRAPPED"])
+            });
+        }
+
+        return list;
+    }
+
     public async Task<List<string>> GetBrandsAsync()
     {
         var list = new List<string>();

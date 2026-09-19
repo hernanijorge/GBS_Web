@@ -10,7 +10,13 @@
 
 <h1>Components</h1>
 
-<button class="btn btn-primary mb-3" @onclick="OpenAddModal">+ Add Component</button>
+<div class="d-flex gap-2 mb-3 flex-wrap">
+    <button class="btn btn-primary" @onclick="OpenAddModal">+ Add Component</button>
+    <a class="btn btn-outline-secondary ms-auto" href="/components/report/pdf" target="_blank">Report PDF</a>
+    <a class="btn btn-outline-secondary" href="/components/report/excel" target="_blank">Report Excel</a>
+    <a class="btn btn-outline-secondary" href="/components/summary/pdf" target="_blank">Summary PDF</a>
+    <a class="btn btn-outline-secondary" href="/components/summary/excel" target="_blank">Summary Excel</a>
+</div>
 
 @if (_loading)
 {

@@ -82,6 +82,49 @@ public class RemessaRepository
         return list;
     }
 
+    // For the shipment report (ReportService.vb GerarExcelRemessa/GerarPdfRemessa) —
+    // PROC_SELECT_ITENS doesn't return SERIAL_NUMBER or CONDITION_STATUS, so this
+    // joins TBL_REMESSA_ITEM straight to TBL_EQUIPAMENTO as plain SQL rather than
+    // touching the package.
+    public async Task<List<Models.ItemRemessa>> GetItemsForReportAsync(string remessaRef)
+    {
+        var list = new List<Models.ItemRemessa>();
+
+        using var connection = new OracleConnection(_connectionString);
+        await connection.OpenAsync();
+
+        using var command = connection.CreateCommand();
+        command.CommandType = CommandType.Text;
+        command.CommandText =
+            "SELECT E.INTERNAL_UID, E.MARCA, E.MODEL, E.SERIAL_NUMBER, E.PROCESSADOR, " +
+            "       E.RAM_GB, E.STORAGE_GB, E.CONDITION_STATUS " +
+            "  FROM TBL_REMESSA_ITEM RI " +
+            "  JOIN TBL_REMESSA R ON R.ID_REMESSA = RI.ID_REMESSA " +
+            "  JOIN TBL_EQUIPAMENTO E ON E.ID_EQUIPAMENTO = RI.ID_EQUIPAMENTO " +
+            " WHERE R.CODIGO_REMESSA = :P_CODIGO_REMESSA " +
+            " ORDER BY E.INTERNAL_UID";
+        command.BindByName = true;
+        AddParam(command, "P_CODIGO_REMESSA", OracleDbType.Varchar2, remessaRef);
+
+        using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            list.Add(new Models.ItemRemessa
+            {
+                InternalUid = reader["INTERNAL_UID"] as string ?? "",
+                Manufacturer = reader["MARCA"] as string,
+                Model = reader["MODEL"] as string,
+                SerialNumber = reader["SERIAL_NUMBER"] as string,
+                CpuModel = reader["PROCESSADOR"] as string,
+                RamGb = reader["RAM_GB"] is DBNull ? null : Convert.ToInt32(reader["RAM_GB"]),
+                StorageGb = reader["STORAGE_GB"] is DBNull ? null : Convert.ToInt32(reader["STORAGE_GB"]),
+                ConditionStatus = reader["CONDITION_STATUS"] as string
+            });
+        }
+
+        return list;
+    }
+
     // Port of clsLeituraRemessa.selecionarEquipamentosDisponiveis — no PACK_REMESSA
     // proc exists for this; the desktop app already runs it as plain SQL.
     public async Task<List<Models.Equipamento>> GetAvailableEquipmentAsync(string? search)

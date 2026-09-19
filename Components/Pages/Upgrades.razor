@@ -22,7 +22,8 @@
             <option value="365">365 days</option>
         </select>
     </div>
-    <button class="btn btn-primary ms-auto" @onclick="OpenNewModal">+ Register Upgrade</button>
+    <a class="btn btn-outline-secondary ms-auto" href="@($"/upgrades/report/excel?days={_days}")" target="_blank">Report by Client (Excel)</a>
+    <button class="btn btn-primary" @onclick="OpenNewModal">+ Register Upgrade</button>
 </div>
 
 @if (_loading)

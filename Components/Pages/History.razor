@@ -1,0 +1,159 @@
+@page "/inventory/{Id:int}/history"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using GBS_Web.Data
+@using GBS_Web.Models
+@inject EquipamentoRepository EquipRepository
+@inject HistoryRepository Repository
+@inject NavigationManager Nav
+
+<PageTitle>Equipment History</PageTitle>
+
+@if (_loading)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_equipment is null)
+{
+    <p><em>Equipment not found.</em></p>
+    <a class="btn btn-outline-secondary" href="/inventory">Back to Inventory</a>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-start mb-3">
+        <div>
+            <h1 class="mb-0">@_equipment.InternalUid</h1>
+            <div class="text-muted">
+                @_equipment.Manufacturer @_equipment.Model | S/N: @_equipment.SerialNumber |
+                @_equipment.CpuModel @_equipment.RamGb GB RAM @_equipment.StorageGb GB |
+                Status: @_equipment.Status
+            </div>
+        </div>
+        <div class="d-flex gap-2">
+            <a class="btn btn-outline-secondary" href="/inventory">Back to Inventory</a>
+            <a class="btn btn-outline-secondary" href="@($"/inventory/{Id}/history/pdf")" target="_blank">Report PDF</a>
+            <a class="btn btn-outline-secondary" href="@($"/inventory/{Id}/history/excel")" target="_blank">Report Excel</a>
+        </div>
+    </div>
+
+    <h5>1. Arrival</h5>
+    <table class="table table-sm table-bordered mb-4">
+        <thead>
+            <tr>
+                <th>Date Registered</th>
+                <th>Source Batch</th>
+                <th>Condition</th>
+                <th>Status</th>
+                <th>Serial Number</th>
+                <th>Notes</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>@(_equipment.DataCadastro?.ToString("yyyy-MM-dd"))</td>
+                <td>@_equipment.SourceBatch</td>
+                <td>@_equipment.ConditionStatus</td>
+                <td>@_equipment.Status</td>
+                <td>@_equipment.SerialNumber</td>
+                <td>@_equipment.Notes</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h5>2. Upgrades</h5>
+    @if (_upgrades.Count == 0)
+    {
+        <p class="text-muted"><em>No upgrades recorded.</em></p>
+    }
+    else
+    {
+        <table class="table table-sm table-bordered">
+            <thead>
+                <tr>
+                    <th>Date</th><th>Component</th><th>Before</th><th>After</th>
+                    <th>Source</th><th>Cost (USD)</th><th>Part S/N</th><th>Technician</th><th>Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var u in _upgrades)
+                {
+                    <tr>
+                        <td>@(u.DataUpgrade?.ToString("yyyy-MM-dd"))</td>
+                        <td>@u.ComponentType</td>
+                        <td>@u.ValueBefore</td>
+                        <td>@u.ValueAfter</td>
+                        <td>@u.SourceOrigem</td>
+                        <td class="text-end">@((u.CostUsd ?? 0).ToString("N2"))</td>
+                        <td>@u.PartSerial</td>
+                        <td>@u.Technician</td>
+                        <td>@u.Notes</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+    <p class="fw-bold">Total upgrade cost: $ @(_upgrades.Sum(u => u.CostUsd ?? 0).ToString("N2")) | @_upgrades.Count record(s)</p>
+
+    <h5 class="mt-4">3. Shipments</h5>
+    @if (_shipments.Count == 0)
+    {
+        <p class="text-muted"><em>No shipments recorded.</em></p>
+    }
+    else
+    {
+        <table class="table table-sm table-bordered">
+            <thead>
+                <tr>
+                    <th>Shipment Ref</th><th>Carrier</th><th>Tracking</th><th>Recipient</th>
+                    <th>Est. Delivery</th><th>Actual Delivery</th><th>Status</th>
+                    <th>Shipping Cost</th><th>Sale Price (USD)</th><th>Condition</th><th>Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var s in _shipments)
+                {
+                    <tr>
+                        <td>@s.RemessaRef</td>
+                        <td>@s.Carrier</td>
+                        <td>@s.TrackingNumber</td>
+                        <td>@s.RecipientName</td>
+                        <td>@(s.DataEnvio?.ToString("yyyy-MM-dd"))</td>
+                        <td>@(s.DataEntrega?.ToString("yyyy-MM-dd"))</td>
+                        <td>@s.StatusRemessa</td>
+                        <td class="text-end">@((s.ShippingCostUsd ?? 0).ToString("N2"))</td>
+                        <td class="text-end">@((s.SalePriceUsd ?? 0).ToString("N2"))</td>
+                        <td>@s.ConditionAtShip</td>
+                        <td>@s.ItemNotes</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+    <p class="fw-bold">
+        Sale price: $ @(_shipments.Sum(s => s.SalePriceUsd ?? 0).ToString("N2")) |
+        Shipping cost: $ @(_shipments.Sum(s => s.ShippingCostUsd ?? 0).ToString("N2")) |
+        @_shipments.Count shipment(s)
+    </p>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private bool _loading = true;
+    private Equipamento? _equipment;
+    private List<HistoryUpgradeRow> _upgrades = new();
+    private List<HistoryShipmentRow> _shipments = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _loading = true;
+        _equipment = await EquipRepository.GetByIdAsync(Id);
+        if (_equipment is not null)
+        {
+            _upgrades = await Repository.GetUpgradesAsync(Id);
+            _shipments = await Repository.GetShipmentsAsync(Id);
+        }
+        _loading = false;
+    }
+}

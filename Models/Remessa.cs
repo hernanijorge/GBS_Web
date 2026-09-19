@@ -53,9 +53,15 @@ public class ItemRemessa
     public string InternalUid { get; set; } = "";
     public string? Manufacturer { get; set; }
     public string? Model { get; set; }
+    public string? SerialNumber { get; set; }
     public string? CpuModel { get; set; }
     public int? RamGb { get; set; }
     public int? StorageGb { get; set; }
+
+    // Equipment's real CONDITION_STATUS (TBL_EQUIPAMENTO) — "Battery Condition" in
+    // the desktop's shipment report (ReportService.vb GerarExcelRemessa/GerarPdfRemessa).
+    // Only populated by the report query; not part of the create-shipment flow.
+    public string? ConditionStatus { get; set; }
 
     // Collected in the desktop form but TBL_REMESSA_ITEM has no CONDITION_AT_SHIP
     // column — never persisted, display-only before save.

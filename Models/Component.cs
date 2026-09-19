@@ -36,3 +36,20 @@ public class Component
         }
     }
 }
+
+// Port of clsReadComponent.vb's selectSummary() — one row per distinct
+// (type, capacity, generation, speed, cpu, storage) group.
+public class ComponentSummary
+{
+    public string ComponentType { get; set; } = "";
+    public int CapacityGb { get; set; }
+    public string? Generation { get; set; }
+    public int? SpeedMhz { get; set; }
+    public string? Cpu { get; set; }
+    public int? StorageGb { get; set; }
+    public int Total { get; set; }
+    public int InStock { get; set; }
+    public int Installed { get; set; }
+    public int Sold { get; set; }
+    public int Scrapped { get; set; }
+}

@@ -28,3 +28,19 @@ public class Upgrade
     public string ActionType { get; set; } = "MANUAL";
     public string? CompNewStatus { get; set; }
 }
+
+// Port of clsLeituraUpgrade.selecionarUpgradesComCliente's DataRow shape — used
+// only by the per-client upgrade report (ReportService.vb GerarExcelUpgradesPorCliente).
+public class UpgradeReportRow
+{
+    public string Customer { get; set; } = "Unassigned";
+    public string InternalUid { get; set; } = "";
+    public string? Model { get; set; }
+    public string? SerialNumber { get; set; }
+    public DateTime? DataUpgrade { get; set; }
+    public string ComponentType { get; set; } = "";
+    public string? ValueBefore { get; set; }
+    public string? ValueAfter { get; set; }
+    public string? Technician { get; set; }
+    public string? Notes { get; set; }
+}
