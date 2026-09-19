@@ -8,7 +8,16 @@ COPY GBS_Web.csproj .
 RUN dotnet restore GBS_Web.csproj
 
 COPY . .
-RUN dotnet publish GBS_Web.csproj -c Release -o /app/publish --no-restore
+# NOT --no-restore: the early restore above only saw GBS_Web.csproj (for
+# layer caching), before wwwroot/Components existed. Publishing with
+# --no-restore then skips re-evaluating static web assets against the real
+# source tree, silently dropping the Blazor JS runtime (_framework/
+# blazor.web.js) from the output — every server-side interactive control
+# (buttons, filters, forms bound via @onclick/@bind) then does nothing,
+# with no client-side error, because the SignalR circuit script never
+# loads. Confirmed by reproducing the restore-then-copy-then-publish
+# sequence locally: dropping --no-restore here fixes it.
+RUN dotnet publish GBS_Web.csproj -c Release -o /app/publish
 
 # ---- Runtime stage --------------------------------------------------------
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
