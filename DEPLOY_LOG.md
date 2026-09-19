@@ -107,11 +107,11 @@ GitHub Desktop estava acompanhando um clone antigo (`C:\Users\herna\Desktop\GBS_
 7. **Validação externa completa** (de fora da VM, não só localhost): login via curl + Dashboard retornando os dados corretos em `http://129.80.215.94/`.
 8. **`deploy.sh` testado de verdade**: rodado em produção, fez pull + restart do container, site confirmado no ar depois.
 
-## Fase E — Portação de relatórios (ReportService.vb → GBS_Web) 🟡 Pronta localmente, não commitada/deployada
+## Fase E — Portação de relatórios (ReportService.vb → GBS_Web) ✅ Concluída e em produção
 
 Portados todos os relatórios de `Utils/ReportService.vb` (GBS_Inventory desktop) pro GBS_Web, um de cada vez, com `dotnet build` (0 erros) depois de cada item. Além do `ReportService.vb`, também portados os relatórios de `Views/frmHistoricoEquipamento.vb` (histórico do equipamento) e `Views/frmImportacao.vb` (qualidade da importação), conforme pedido. Padrão seguido em todos: PDF via itext7 (paleta de cores igual ao `InvoicePdfGenerator.cs`), Excel via ClosedXML, endpoint `GET /{rota}/{id}/pdf` + `/excel` com `.RequireAuthorization()`, botão de download na página correspondente.
 
-**Importante: nada foi commitado, nem dado push, nem subido pra VM** — tudo local em `C:\GBS\GBS_Web`, pronto pra revisão. `git status` mostra as mudanças como *not staged*.
+**Deploy (19/09/2026):** commit `dcc33f6`, push pro `master`, GitHub Actions (`docker-build.yml`, run #12) build multi-arch com sucesso, `deploy.sh` rodado contra a VM — pull da imagem nova, container `gbs_web` recriado, health check local (`HTTP 200` em `/login` de dentro da VM) e externo (`HTTP 200` em `http://129.80.215.94/login`) confirmados. Não foi possível clicar nos botões novos em produção nesta sessão (sem a senha de produção, guardada só no arquivo local do usuário) — recomendado um clique manual de conferência (ver "Pendência" no fim desta seção).
 
 ### Item 0 — Shipment Report (`Shipments.razor`)
 
@@ -181,6 +181,10 @@ Servidor de dev local rodado pelo usuário com `GBS_ORACLE_PASSWORD` real; todos
 
 Dados de teste deixados no Oracle XE local (equipamento `QATEST-IMPORT-001`/`QATEST-IMPORT-002`, mesmo padrão dos dados de teste já existentes tipo `WEBTEST001`/`SCHEMATEST001`) — não removidos, por não ser prática estabelecida neste projeto limpar dados de teste do banco de dev local.
 
+### Pendência — conferência manual em produção
+
+Todo o teste de ponta a ponta acima foi feito contra o **Oracle XE local**. Em produção, o deploy foi validado só até o nível de infraestrutura (container no ar, health check HTTP 200) — ninguém clicou nos botões novos (Report PDF/Excel, Summary, History, Generate Report) em `http://129.80.215.94/` ainda, porque a sessão não tem a senha de admin de produção (fica só no arquivo local do usuário). Recomendo um clique de conferência rápido lá antes de considerar a Fase E 100% fechada.
+
 ### Novos endpoints (Fase E)
 
 | Rota | Método | Página |
@@ -205,9 +209,8 @@ Recursos Always Free (VM e Autonomous DB) não geram custo independente de uptim
 - Registrar um domínio e apontar (registro DNS tipo A) pro IP `129.80.215.94`.
 - Trocar o `Caddyfile` de `:80` pro domínio — Let's Encrypt emite certificado automaticamente, sem mais nenhuma configuração manual.
 - (Opcional/limpeza) confirmar se existe duplicidade de arquivo `DEPLOY_LOG.md` na raiz do repo vs. em `docs/`, e consolidar num só caminho.
-- **Fase E:** todos os 7 itens testados de ponta a ponta (ver "Verificação" acima) — nenhum bug encontrado na lógica nova; um gap pré-existente do pacote original (`PROC_UPSERT_EQUIPAMENTO` sem `SOURCE_BATCH`) foi documentado, não corrigido.
-- **Fase E:** revisar e, se aprovado, commitar/push das mudanças locais — nada foi commitado ainda.
+- **Fase E:** conferência manual dos botões novos em produção (ver "Pendência" acima) — infraestrutura validada, cliques ainda não.
 - (Opcional, separado da Fase E) avaliar se vale estender `PACK_EQUIPAMENTO.PROC_UPSERT_EQUIPAMENTO` com `P_SOURCE_BATCH`, já que hoje toda importação em massa perde essa informação — tanto no desktop quanto no GBS_Web.
 
 ---
-*Última atualização: 19/09/2026 — Fase E (portação de relatórios) testada de ponta a ponta, pronta pra revisão. GBS_Web em produção em http://129.80.215.94/ segue inalterado (nada desta fase foi deployado).*
+*Última atualização: 19/09/2026 — Fase E (portação de relatórios) testada de ponta a ponta localmente, commitada (`dcc33f6`), pushed, e deployada em produção em http://129.80.215.94/ (build multi-arch #12, container recriado, health check OK).*
