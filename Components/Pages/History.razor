@@ -38,6 +38,7 @@ else
     </div>
 
     <h5>1. Arrival</h5>
+    <div class="table-responsive">
     <table class="table table-sm table-bordered mb-4">
         <thead>
             <tr>
@@ -60,6 +61,7 @@ else
             </tr>
         </tbody>
     </table>
+    </div>
 
     <h5>2. Upgrades</h5>
     @if (_upgrades.Count == 0)
@@ -68,6 +70,7 @@ else
     }
     else
     {
+        <div class="table-responsive">
         <table class="table table-sm table-bordered">
             <thead>
                 <tr>
@@ -92,6 +95,7 @@ else
                 }
             </tbody>
         </table>
+        </div>
     }
     <p class="fw-bold">Total upgrade cost: $ @(_upgrades.Sum(u => u.CostUsd ?? 0).ToString("N2")) | @_upgrades.Count record(s)</p>
 
@@ -102,6 +106,7 @@ else
     }
     else
     {
+        <div class="table-responsive">
         <table class="table table-sm table-bordered">
             <thead>
                 <tr>
@@ -129,6 +134,7 @@ else
                 }
             </tbody>
         </table>
+        </div>
     }
     <p class="fw-bold">
         Sale price: $ @(_shipments.Sum(s => s.SalePriceUsd ?? 0).ToString("N2")) |

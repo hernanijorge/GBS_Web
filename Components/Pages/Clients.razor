@@ -27,6 +27,7 @@ else if (_clients.Count == 0)
 }
 else
 {
+    <div class="table-responsive">
     <table class="table table-striped table-hover">
         <thead>
             <tr><th>Name</th><th>Document</th><th>Email</th><th>Phone</th><th>City</th><th>Active</th><th></th></tr>
@@ -46,6 +47,7 @@ else
             }
         </tbody>
     </table>
+    </div>
 }
 
 @if (_statusMessage is not null)

@@ -85,6 +85,7 @@
         </div>
     </div>
 
+    <div class="table-responsive">
     <table class="table table-sm table-bordered">
         <thead>
             <tr>
@@ -111,6 +112,7 @@
             }
         </tbody>
     </table>
+    </div>
     <p class="text-muted">
         Total: @_analysis.Count | OK / According to spreadsheet: @_analysis.Count(r => !r.Problem) |
         Issues: @_analysis.Count(r => r.Problem)
