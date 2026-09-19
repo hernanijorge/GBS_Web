@@ -111,7 +111,9 @@ GitHub Desktop estava acompanhando um clone antigo (`C:\Users\herna\Desktop\GBS_
 
 Portados todos os relatórios de `Utils/ReportService.vb` (GBS_Inventory desktop) pro GBS_Web, um de cada vez, com `dotnet build` (0 erros) depois de cada item. Além do `ReportService.vb`, também portados os relatórios de `Views/frmHistoricoEquipamento.vb` (histórico do equipamento) e `Views/frmImportacao.vb` (qualidade da importação), conforme pedido. Padrão seguido em todos: PDF via itext7 (paleta de cores igual ao `InvoicePdfGenerator.cs`), Excel via ClosedXML, endpoint `GET /{rota}/{id}/pdf` + `/excel` com `.RequireAuthorization()`, botão de download na página correspondente.
 
-**Deploy (19/09/2026):** commit `dcc33f6`, push pro `master`, GitHub Actions (`docker-build.yml`, run #12) build multi-arch com sucesso, `deploy.sh` rodado contra a VM — pull da imagem nova, container `gbs_web` recriado, health check local (`HTTP 200` em `/login` de dentro da VM) e externo (`HTTP 200` em `http://129.80.215.94/login`) confirmados. Não foi possível clicar nos botões novos em produção nesta sessão (sem a senha de produção, guardada só no arquivo local do usuário) — recomendado um clique manual de conferência (ver "Pendência" no fim desta seção).
+**Deploy (19/09/2026):** commit `dcc33f6`, push pro `master`, GitHub Actions (`docker-build.yml`, run #12) build multi-arch com sucesso, `deploy.sh` rodado contra a VM — pull da imagem nova, container `gbs_web` recriado, health check local (`HTTP 200` em `/login` de dentro da VM) e externo (`HTTP 200` em `http://129.80.215.94/login`) confirmados.
+
+**Conferência manual em produção (19/09/2026):** todos os 7 itens testados de ponta a ponta contra `http://129.80.215.94/` (autenticação via `admin` + senha de produção lida direto de arquivo local pro curl, nunca impressa) — conteúdo real de PDF/Excel conferido, comparado com dados já existentes lá. **Todos passaram**, sem regressão nem bug novo. Detalhe por item na tabela "Verificação" abaixo.
 
 ### Item 0 — Shipment Report (`Shipments.razor`)
 
@@ -163,7 +165,7 @@ Portados todos os relatórios de `Utils/ReportService.vb` (GBS_Inventory desktop
 - **Gap documentado:** o override manual do checkbox "Problem?" na tela só afeta a exibição em tela; o PDF/Excel exportado sempre usa o flag calculado pelo servidor (mesma limitação existiria de qualquer forma, já que o export é via endpoint HTTP stateless, não via estado do circuito Blazor).
 - **Testado de ponta a ponta**, incluindo upload real de planilha via navegador (ver "Verificação" abaixo).
 
-### Verificação — todos os itens testados ✅ (19/09/2026)
+### Verificação — local (dev) ✅ (19/09/2026)
 
 Servidor de dev local rodado pelo usuário com `GBS_ORACLE_PASSWORD` real; todos os 7 itens da Fase E testados de ponta a ponta (curl autenticado + inspeção de conteúdo de PDF/Excel célula-a-célula via `openpyxl`, mais um teste real de upload/import via navegador pro Item 6). Resultado: **todos passaram**, sem bugs na lógica nova desta fase.
 
@@ -181,9 +183,21 @@ Servidor de dev local rodado pelo usuário com `GBS_ORACLE_PASSWORD` real; todos
 
 Dados de teste deixados no Oracle XE local (equipamento `QATEST-IMPORT-001`/`QATEST-IMPORT-002`, mesmo padrão dos dados de teste já existentes tipo `WEBTEST001`/`SCHEMATEST001`) — não removidos, por não ser prática estabelecida neste projeto limpar dados de teste do banco de dev local.
 
-### Pendência — conferência manual em produção
+### Verificação — produção ✅ (19/09/2026)
 
-Todo o teste de ponta a ponta acima foi feito contra o **Oracle XE local**. Em produção, o deploy foi validado só até o nível de infraestrutura (container no ar, health check HTTP 200) — ninguém clicou nos botões novos (Report PDF/Excel, Summary, History, Generate Report) em `http://129.80.215.94/` ainda, porque a sessão não tem a senha de admin de produção (fica só no arquivo local do usuário). Recomendo um clique de conferência rápido lá antes de considerar a Fase E 100% fechada.
+Autenticado contra `http://129.80.215.94/account/login` (senha lida direto de um arquivo local pro curl via `$(cat arquivo)`, nunca impressa em terminal/log). Testados todos os 7 itens contra dados reais já existentes em produção — nenhum dado de teste criado/importado/alterado lá, só leitura.
+
+| Item | Resultado | Como foi testado |
+|---|---|---|
+| 0 — Shipments | ✅ Passou | PDF+Excel do envio `GBS-SH-20260919142203` (equipamento `00001`) conferidos, RAM batendo com o valor pós-upgrade |
+| 1 — Inventory | ✅ Passou | PDF+Excel filtrados por `search=00226357`, 1 item, todas as 9 colunas batendo com a página `/inventory` |
+| 2 — Components | ✅ Passou | PDF+Excel do único componente em produção (`M000006`), batendo com a página `/components` |
+| 3 — Components Summary | ✅ Passou | 1 grupo, Total/In Stock corretos, batendo com o Item 2 |
+| 4 — Upgrades por cliente | ✅ Passou | Excel com 3 abas ("CALIXTO", "Claude Code Test Recipient", "Unassigned") — o join CUSTOMER↔DESTINATARIO revelou corretamente um cliente real ("CALIXTO") pro equipamento `00001` |
+| 5 — Equipment History | ✅ Passou | PDF+Excel do equipamento `WEBTEST001` (id 668) — as 3 seções idênticas ao teste local (mesma massa de dados migrada) |
+| 6 — Import Quality | ✅ Passou | Endpoint testado com UIDs reais já existentes (`00001`, `WEBTEST001`, `SCHEMATEST001`) — sem criar nenhuma importação nova em produção; lógica de flag (Observation/IN_REPAIR/FAIR-POOR) correta, 66.7% issue rate batendo |
+
+Nenhum bug novo encontrado em produção. Fase E considerada 100% fechada.
 
 ### Novos endpoints (Fase E)
 
@@ -209,8 +223,7 @@ Recursos Always Free (VM e Autonomous DB) não geram custo independente de uptim
 - Registrar um domínio e apontar (registro DNS tipo A) pro IP `129.80.215.94`.
 - Trocar o `Caddyfile` de `:80` pro domínio — Let's Encrypt emite certificado automaticamente, sem mais nenhuma configuração manual.
 - (Opcional/limpeza) confirmar se existe duplicidade de arquivo `DEPLOY_LOG.md` na raiz do repo vs. em `docs/`, e consolidar num só caminho.
-- **Fase E:** conferência manual dos botões novos em produção (ver "Pendência" acima) — infraestrutura validada, cliques ainda não.
 - (Opcional, separado da Fase E) avaliar se vale estender `PACK_EQUIPAMENTO.PROC_UPSERT_EQUIPAMENTO` com `P_SOURCE_BATCH`, já que hoje toda importação em massa perde essa informação — tanto no desktop quanto no GBS_Web.
 
 ---
-*Última atualização: 19/09/2026 — Fase E (portação de relatórios) testada de ponta a ponta localmente, commitada (`dcc33f6`), pushed, e deployada em produção em http://129.80.215.94/ (build multi-arch #12, container recriado, health check OK).*
+*Última atualização: 19/09/2026 — Fase E (portação de relatórios) testada de ponta a ponta local e em produção, commitada (`dcc33f6`), pushed, e deployada em http://129.80.215.94/ (build multi-arch #12, container recriado). Todos os 7 itens confirmados funcionando em produção com dados reais.*
