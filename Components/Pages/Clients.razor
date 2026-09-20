@@ -27,7 +27,7 @@ else if (_clients.Count == 0)
 }
 else
 {
-    <div class="table-responsive">
+    <div class="table-responsive d-none d-md-block">
     <table class="table table-striped table-hover">
         <thead>
             <tr><th>Name</th><th>Document</th><th>Email</th><th>Phone</th><th>City</th><th>Active</th><th></th></tr>
@@ -47,6 +47,33 @@ else
             }
         </tbody>
     </table>
+    </div>
+
+    <div class="d-block d-md-none">
+        @foreach (var c in _clients)
+        {
+            <div class="card mb-2">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="fw-bold">@c.NomeExibicao</div>
+                        <span class="badge @(c.Ativo == "Y" ? "bg-success" : "bg-secondary")">@(c.Ativo == "Y" ? "Active" : "Inactive")</span>
+                    </div>
+                    <dl class="row row-cols-2 g-1 small mb-0 mt-2">
+                        <dt class="col-6 text-muted fw-normal">Document</dt>
+                        <dd class="col-6">@c.Documento</dd>
+                        <dt class="col-6 text-muted fw-normal">Email</dt>
+                        <dd class="col-6">@c.Email</dd>
+                        <dt class="col-6 text-muted fw-normal">Phone</dt>
+                        <dd class="col-6">@c.Telefone</dd>
+                        <dt class="col-6 text-muted fw-normal">City</dt>
+                        <dd class="col-6">@c.Cidade</dd>
+                    </dl>
+                    <div class="mt-2">
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => OpenEditModal(c)">Edit</button>
+                    </div>
+                </div>
+            </div>
+        }
     </div>
 }
 
