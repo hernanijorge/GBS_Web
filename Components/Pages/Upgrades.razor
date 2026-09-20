@@ -36,7 +36,7 @@ else if (_upgrades.Count == 0)
 }
 else
 {
-    <div class="table-responsive">
+    <div class="table-responsive d-none d-md-block">
     <table class="table table-striped table-hover">
         <thead>
             <tr>
@@ -64,6 +64,33 @@ else
             }
         </tbody>
     </table>
+    </div>
+
+    <div class="d-block d-md-none">
+        @foreach (var u in _upgrades)
+        {
+            <div class="card mb-2">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="fw-bold">@u.InternalUid</div>
+                            <div class="text-muted">@u.ComponentType</div>
+                        </div>
+                        <span class="text-muted small">@(u.DataUpgrade?.ToString("yyyy-MM-dd HH:mm"))</span>
+                    </div>
+                    <dl class="row row-cols-2 g-1 small mb-0 mt-2">
+                        <dt class="col-6 text-muted fw-normal">Before</dt>
+                        <dd class="col-6">@u.ValueBefore</dd>
+                        <dt class="col-6 text-muted fw-normal">After</dt>
+                        <dd class="col-6">@u.ValueAfter</dd>
+                        <dt class="col-6 text-muted fw-normal">Technician</dt>
+                        <dd class="col-6">@u.Technician</dd>
+                        <dt class="col-6 text-muted fw-normal">Notes</dt>
+                        <dd class="col-6">@u.Notes</dd>
+                    </dl>
+                </div>
+            </div>
+        }
     </div>
 }
 
