@@ -28,7 +28,7 @@ else if (_components.Count == 0)
 }
 else
 {
-    <div class="table-responsive">
+    <div class="table-responsive d-none d-md-block">
     <table class="table table-striped table-hover">
         <thead>
             <tr>
@@ -64,6 +64,42 @@ else
             }
         </tbody>
     </table>
+    </div>
+
+    <div class="d-block d-md-none">
+        @foreach (var c in _components)
+        {
+            <div class="card mb-2">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="fw-bold">@c.ComponentType</div>
+                            <div class="text-muted">@c.DisplayLabel</div>
+                        </div>
+                        <span class="badge @ComponentStatusBadgeClass(c.Status)">@c.Status</span>
+                    </div>
+                    <dl class="row row-cols-2 g-1 small mb-0 mt-2">
+                        <dt class="col-6 text-muted fw-normal">UID</dt>
+                        <dd class="col-6">@c.InternalUid</dd>
+                        <dt class="col-6 text-muted fw-normal">Brand</dt>
+                        <dd class="col-6">@c.Brand</dd>
+                        <dt class="col-6 text-muted fw-normal">Condition</dt>
+                        <dd class="col-6">@c.ConditionStatus</dd>
+                        <dt class="col-6 text-muted fw-normal">Created</dt>
+                        <dd class="col-6">@(c.DateCreated?.ToString("yyyy-MM-dd HH:mm"))</dd>
+                    </dl>
+                    <div class="mt-2">
+                        <select class="form-select form-select-sm" style="width: auto;" value="@c.Status"
+                                @onchange="e => OnStatusChanged(c, e)">
+                            <option value="IN_STOCK">IN_STOCK</option>
+                            <option value="INSTALLED">INSTALLED</option>
+                            <option value="SOLD">SOLD</option>
+                            <option value="SCRAPPED">SCRAPPED</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        }
     </div>
 }
 
@@ -301,4 +337,13 @@ else
         await Repository.UpdateStatusAsync(c.IdComponent, newStatus);
         c.Status = newStatus;
     }
+
+    private static string ComponentStatusBadgeClass(string status) => status switch
+    {
+        "IN_STOCK" => "bg-success",
+        "INSTALLED" => "bg-primary",
+        "SOLD" => "bg-secondary",
+        "SCRAPPED" => "bg-dark",
+        _ => "bg-secondary"
+    };
 }
