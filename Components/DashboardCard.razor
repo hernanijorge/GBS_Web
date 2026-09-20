@@ -1,14 +1,29 @@
 <div class="col-md-@Col">
-    <div class="card text-center shadow-sm h-100">
-        <div class="card-body">
-            <div class="display-6">@Value</div>
-            <div class="text-muted">@Title</div>
+    @if (!string.IsNullOrEmpty(Href))
+    {
+        <a href="@Href" class="text-decoration-none text-reset d-block h-100">
+            <div class="card text-center shadow-sm h-100 dashboard-card-link">
+                <div class="card-body">
+                    <div class="display-6">@Value</div>
+                    <div class="text-muted">@Title</div>
+                </div>
+            </div>
+        </a>
+    }
+    else
+    {
+        <div class="card text-center shadow-sm h-100">
+            <div class="card-body">
+                <div class="display-6">@Value</div>
+                <div class="text-muted">@Title</div>
+            </div>
         </div>
-    </div>
+    }
 </div>
 
 @code {
     [Parameter] public string Title { get; set; } = "";
     [Parameter] public int Value { get; set; }
     [Parameter] public int Col { get; set; } = 3;
+    [Parameter] public string? Href { get; set; }
 }

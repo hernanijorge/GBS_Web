@@ -17,18 +17,18 @@ else
 {
     <h5 class="text-muted mt-3">Equipment totals</h5>
     <div class="row g-3 mb-4">
-        <DashboardCard Title="Total Units" Value="_totals!.TotalUnidades" Col="2" />
-        <DashboardCard Title="In Stock" Value="_totals!.EmEstoque" Col="2" />
-        <DashboardCard Title="Good Condition" Value="_totals!.CondicaoBoa" Col="2" />
-        <DashboardCard Title="Upgrades (30d)" Value="_totals!.Upgrades30d" Col="2" />
-        <DashboardCard Title="Active Shipments" Value="_totals!.RemessasAtivas" Col="2" />
+        <DashboardCard Title="Total Units" Value="_totals!.TotalUnidades" Col="2" Href="/inventory" />
+        <DashboardCard Title="In Stock" Value="_totals!.EmEstoque" Col="2" Href="/inventory" />
+        <DashboardCard Title="Good Condition" Value="_totals!.CondicaoBoa" Col="2" Href="/inventory" />
+        <DashboardCard Title="Upgrades (30d)" Value="_totals!.Upgrades30d" Col="2" Href="/upgrades" />
+        <DashboardCard Title="Active Shipments" Value="_totals!.RemessasAtivas" Col="2" Href="/shipments" />
     </div>
 
     <h5 class="text-muted">In-stock breakdown (distinct)</h5>
     <div class="row g-3">
-        <DashboardCard Title="Manufacturer (IN_STOCK)" Value="_resumo!.ManufacturerCount" Col="3" />
-        <DashboardCard Title="Model (IN_STOCK)" Value="_resumo!.ModelCount" Col="3" />
-        <DashboardCard Title="CPU Family (IN_STOCK)" Value="_resumo!.CpuFamilyCount" Col="3" />
+        <DashboardCard Title="Manufacturer (IN_STOCK)" Value="_resumo!.ManufacturerCount" Col="3" Href="/inventory" />
+        <DashboardCard Title="Model (IN_STOCK)" Value="_resumo!.ModelCount" Col="3" Href="/inventory" />
+        <DashboardCard Title="CPU Family (IN_STOCK)" Value="_resumo!.CpuFamilyCount" Col="3" Href="/inventory" />
     </div>
 }
 
