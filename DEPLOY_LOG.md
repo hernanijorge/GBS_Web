@@ -2,6 +2,8 @@
 
 Histórico técnico da migração do GBS_Web (Blazor Server) do ambiente local pra produção na Oracle Cloud Always Free. Mantido como referência — atualizar a cada fase concluída.
 
+**Escopo**: este arquivo cobre só o `GBS_Web` (autenticado, gestão interna) — auth, Docker/CI, deploy na VM, relatórios, responsividade mobile. O `GBS_App` (vitrine pública, sem login) é um projeto e repositório **separados** (`github.com/hernanijorge/gbs_app`), com seu próprio histórico de deploy documentado no `README.md` daquele repo; não é coberto aqui.
+
 **Nota de processo:** este arquivo é mantido pela sessão Cowork (nuvem), com base nos relatos da sessão local (Claude Code CLI em `C:\GBS\GBS_Web`, que executa de fato o trabalho técnico via SSH/terminal). Evita duas sessões commitando neste mesmo arquivo ao mesmo tempo.
 
 ---
@@ -214,6 +216,36 @@ Nenhum bug novo encontrado em produção. Fase E considerada 100% fechada.
 
 Todos com `.RequireAuthorization()`.
 
+## Fase F — Responsividade mobile + melhorias de Dashboard/Inventory ✅ Concluída e em produção
+
+Só CSS/layout na parte de responsividade — nenhuma mudança de lógica/endpoint/schema, mesmo deploy, mesma URL.
+
+### Opção 1 — `table-responsive` em todas as tabelas
+
+Confirmado que viewport meta tag (`App.razor`) e o hambúrguer colapsável do `NavMenu` (template padrão do Blazor) já estavam ativos, sem CSS custom sobrescrevendo. Envolvidas em `<div class="table-responsive">` as 6 tabelas pedidas (Inventory, Shipments, Upgrades, Clients, Invoices, Components) mais Import/History/Backup por consistência.
+
+### Continuação — cards no celular (por página)
+
+Mesmo padrão em todas: a tabela existente fica em `d-none d-md-block` (visível só a partir de ~768px, idêntica a antes); um bloco novo `d-block d-md-none` itera a mesma lista já carregada (sem duplicar busca/query) e renderiza um card por linha, com os campos principais em destaque e o resto como pares label/valor. Controles interativos (dropdown de status, botões de ação, links de PDF/Excel) usam o mesmo binding/handler da versão em tabela.
+
+- **Inventory** — card com UID + Model em destaque, badge de Status colorido.
+- **Shipments** — card com Ref + Recipient em destaque, badge de status, dropdown de Status/botão Track/links PDF/Excel mantidos.
+- **Upgrades** — card com Equipamento + Componente em destaque, data no canto; somente leitura (a tabela original também não tem controle por linha).
+- **Clients** — card com Nome em destaque, badge Active/Inactive, botão Edit mantido.
+- **Invoices** — card com Number + Total USD em destaque, badge de status, dropdown de Status e link de Download (PDF) mantidos.
+- **Components** — card com Type + DisplayLabel em destaque, badge de status, dropdown de Status mantido.
+
+Testado localmente em cada página: interação (mudar status/abrir modal/clicar link) dentro do card teve o mesmo efeito que na tabela, revertido depois do teste. 375px/412px sem overflow horizontal em nenhuma página; desktop (~1200px) com a tabela idêntica a antes.
+
+### Melhorias adicionais (mesma fase)
+
+- **Inventory** — contador "Showing N unit(s) matching the current filter." abaixo da busca, visível só quando `search` ou `status` estão preenchidos (`IsFiltered`).
+- **Dashboard** — `DashboardCard` ganhou parâmetro opcional `Href`; quando definido, o card inteiro vira link (hover sutil, CSS scoped em `DashboardCard.razor.css`) pra página de origem dos dados: Total Units/In Stock/Good Condition/breakdowns → `/inventory`, Upgrades (30d) → `/upgrades`, Active Shipments → `/shipments`.
+
+### Deploy
+
+Commitado (`9cd5f73` → `4b0984b`), pushed, build multi-arch reconstruído via CI, container recriado na VM (~5 min depois do último commit desta fase). Confirmado em produção.
+
 ## Notas operacionais — Always Free (custo e inatividade)
 
 Recursos Always Free (VM e Autonomous DB) não geram custo independente de uptime. Riscos são só de **reclamação por inatividade** (não cobrança): VM reclamável se CPU/rede/memória ficarem abaixo de 20% por 7 dias seguidos; Autonomous DB para sozinha após 7 dias sem conexão (reversível) e pode ser deletada após 90 dias corridos parada. Uso ativo do projeto mantém ambos fora de risco.
@@ -222,8 +254,7 @@ Recursos Always Free (VM e Autonomous DB) não geram custo independente de uptim
 
 - Registrar um domínio e apontar (registro DNS tipo A) pro IP `129.80.215.94`.
 - Trocar o `Caddyfile` de `:80` pro domínio — Let's Encrypt emite certificado automaticamente, sem mais nenhuma configuração manual.
-- (Opcional/limpeza) confirmar se existe duplicidade de arquivo `DEPLOY_LOG.md` na raiz do repo vs. em `docs/`, e consolidar num só caminho.
 - (Opcional, separado da Fase E) avaliar se vale estender `PACK_EQUIPAMENTO.PROC_UPSERT_EQUIPAMENTO` com `P_SOURCE_BATCH`, já que hoje toda importação em massa perde essa informação — tanto no desktop quanto no GBS_Web.
 
 ---
-*Última atualização: 19/09/2026 — Fase E (portação de relatórios) testada de ponta a ponta local e em produção, commitada (`dcc33f6`), pushed, e deployada em http://129.80.215.94/ (build multi-arch #12, container recriado). Todos os 7 itens confirmados funcionando em produção com dados reais.*
+*Última atualização: 20/09/2026 — README.md criado; Fase F (responsividade mobile, cards no celular nas 6 telas, contador de Inventory, cards clicáveis do Dashboard) documentada retroativamente (estava commitada/deployada em produção mas não registrada aqui). `docker-compose.yml` local passou a incluir referência ao `gbs-app` (projeto irmão) como serviço de documentação — não afeta o deploy real, que continua via `deploy.sh`/imagem GHCR.*
