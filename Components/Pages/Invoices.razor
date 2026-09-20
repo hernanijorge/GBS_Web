@@ -27,7 +27,7 @@ else if (_invoices.Count == 0)
 }
 else
 {
-    <div class="table-responsive">
+    <div class="table-responsive d-none d-md-block">
     <table class="table table-striped table-hover">
         <thead>
             <tr><th>Number</th><th>Client</th><th>Issue Date</th><th>Due Date</th><th>Total (USD)</th><th>Created</th><th>Status</th><th>PDF</th></tr>
@@ -55,6 +55,42 @@ else
             }
         </tbody>
     </table>
+    </div>
+
+    <div class="d-block d-md-none">
+        @foreach (var inv in _invoices)
+        {
+            <div class="card mb-2">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="fw-bold">@inv.InvoiceNumber</div>
+                            <div class="text-muted">$ @inv.TotalUsd.ToString("0.00")</div>
+                        </div>
+                        <span class="badge @InvoiceStatusBadgeClass(inv.StatusInvoice)">@inv.StatusInvoice</span>
+                    </div>
+                    <dl class="row row-cols-2 g-1 small mb-0 mt-2">
+                        <dt class="col-6 text-muted fw-normal">Client</dt>
+                        <dd class="col-6">@inv.ClienteNome</dd>
+                        <dt class="col-6 text-muted fw-normal">Issue Date</dt>
+                        <dd class="col-6">@inv.IssueDate.ToString("yyyy-MM-dd")</dd>
+                        <dt class="col-6 text-muted fw-normal">Due Date</dt>
+                        <dd class="col-6">@(inv.DueDate?.ToString("yyyy-MM-dd"))</dd>
+                        <dt class="col-6 text-muted fw-normal">Created</dt>
+                        <dd class="col-6">@(inv.DataCadastro?.ToString("yyyy-MM-dd HH:mm"))</dd>
+                    </dl>
+                    <div class="d-flex gap-2 mt-2 align-items-center">
+                        <select class="form-select form-select-sm" style="width: auto;" value="@inv.StatusInvoice" @onchange="e => OnStatusChanged(inv, e)">
+                            <option value="DRAFT">DRAFT</option>
+                            <option value="SENT">SENT</option>
+                            <option value="PAID">PAID</option>
+                            <option value="CANCELLED">CANCELLED</option>
+                        </select>
+                        <a class="btn btn-sm btn-outline-secondary ms-auto" href="@($"/invoices/{inv.IdInvoice}/pdf")" target="_blank">Download</a>
+                    </div>
+                </div>
+            </div>
+        }
     </div>
 }
 
@@ -262,4 +298,12 @@ else
             _statusIsError = true;
         }
     }
+
+    private static string InvoiceStatusBadgeClass(string status) => status switch
+    {
+        "PAID" => "bg-success",
+        "SENT" => "bg-primary",
+        "CANCELLED" => "bg-danger",
+        _ => "bg-secondary"
+    };
 }
