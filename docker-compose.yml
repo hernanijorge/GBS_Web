@@ -22,3 +22,18 @@ services:
     environment:
       - Oracle__DataSource=host.docker.internal:1521/XE
     restart: unless-stopped
+
+  # GBS_App — public storefront, sibling project at ../GBS_App, same Oracle
+  # database/user as gbs-web. No auth, different internal port (8081) so it
+  # can run alongside gbs-web (8080) behind the same Caddy on the VM.
+  gbs-app:
+    build:
+      context: ../GBS_App
+      dockerfile: Dockerfile
+    ports:
+      - "5081:8081"
+    env_file:
+      - ../GBS_App/.env.docker
+    environment:
+      - Oracle__DataSource=host.docker.internal:1521/XE
+    restart: unless-stopped
