@@ -36,6 +36,11 @@
     <button class="btn btn-primary" @onclick="OpenAddModal">+ Add Equipment</button>
 </div>
 
+@if (!_loading && IsFiltered)
+{
+    <p class="text-muted mb-2">Showing <strong>@_equipment.Count</strong> unit(s) matching the current filter.</p>
+}
+
 @if (_loading)
 {
     <p><em>Loading...</em></p>
@@ -253,6 +258,8 @@ else
     private string? _validationError;
     private string _search = "";
     private string _statusFilter = "";
+
+    private bool IsFiltered => !string.IsNullOrWhiteSpace(_search) || !string.IsNullOrWhiteSpace(_statusFilter);
     private Equipamento _newEquipamento = NewEmptyEquipamento();
 
     protected override async Task OnInitializedAsync()
