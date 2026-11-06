@@ -43,7 +43,7 @@ public static class ComponentSummaryReportGenerator
     private static string[] RowValues(ComponentSummary s) =>
     [
         s.ComponentType,
-        s.CapacityGb > 0 ? s.CapacityGb.ToString() : "",
+        s.CapacityGb?.ToString() ?? "",
         s.Generation ?? "",
         s.SpeedMhz?.ToString() ?? "",
         s.Cpu ?? "",

@@ -287,7 +287,7 @@ else
             return;
         }
 
-        if (_newComponent.CapacityGb <= 0)
+        if (_newComponent.CapacityGb is null or <= 0)
         {
             _validationError = _isMiniDesktop ? "RAM (GB) is required." : "Capacity is required.";
             return;

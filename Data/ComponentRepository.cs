@@ -111,7 +111,7 @@ public class ComponentRepository
             list.Add(new Models.ComponentSummary
             {
                 ComponentType = reader["COMPONENT_TYPE"] as string ?? "",
-                CapacityGb = Convert.ToInt32(reader["CAPACITY_GB"]),
+                CapacityGb = reader["CAPACITY_GB"] is DBNull ? null : Convert.ToInt32(reader["CAPACITY_GB"]),
                 Generation = reader["GENERATION"] as string,
                 SpeedMhz = reader["SPEED_MHZ"] is DBNull ? null : Convert.ToInt32(reader["SPEED_MHZ"]),
                 Cpu = reader["CPU"] as string,
@@ -170,7 +170,7 @@ public class ComponentRepository
             IdComponent = Convert.ToInt32(reader["ID_COMPONENT"]),
             InternalUid = reader["INTERNAL_UID"] as string ?? "",
             ComponentType = reader["COMPONENT_TYPE"] as string ?? "",
-            CapacityGb = Convert.ToInt32(reader["CAPACITY_GB"]),
+            CapacityGb = reader["CAPACITY_GB"] is DBNull ? null : Convert.ToInt32(reader["CAPACITY_GB"]),
             SpeedMhz = reader["SPEED_MHZ"] is DBNull ? null : Convert.ToInt32(reader["SPEED_MHZ"]),
             Generation = reader["GENERATION"] as string,
             Brand = reader["BRAND"] as string,

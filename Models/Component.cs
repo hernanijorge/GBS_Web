@@ -5,7 +5,7 @@ public class Component
     public int IdComponent { get; set; }
     public string InternalUid { get; set; } = "";
     public string ComponentType { get; set; } = "";   // RAM, SSD, HDD, MINI_DESKTOP
-    public int CapacityGb { get; set; }
+    public int? CapacityGb { get; set; }
     public int? SpeedMhz { get; set; }                // RAM only
     public string? Generation { get; set; }           // DDR4, DDR5, NVMe, SATA
     public string? Brand { get; set; }
@@ -26,7 +26,7 @@ public class Component
             var parts = new[]
             {
                 ComponentType,
-                CapacityGb > 0 ? $"{CapacityGb} GB" : "",
+                CapacityGb is > 0 ? $"{CapacityGb} GB" : "",
                 Generation ?? "",
                 SpeedMhz is > 0 ? $"{SpeedMhz} MHz" : "",
                 Cpu ?? "",
@@ -42,7 +42,7 @@ public class Component
 public class ComponentSummary
 {
     public string ComponentType { get; set; } = "";
-    public int CapacityGb { get; set; }
+    public int? CapacityGb { get; set; }
     public string? Generation { get; set; }
     public int? SpeedMhz { get; set; }
     public string? Cpu { get; set; }
